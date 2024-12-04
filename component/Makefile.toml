@@ -1,0 +1,43 @@
+[env]
+BUILD_TYPE="release"
+
+[tasks.buildall]
+dependencies = [
+  "component",
+]
+
+[tasks.component]
+dependencies = ["component_elf", "component_bin"]
+
+
+[tasks.component_elf_build]
+command = "cargo"
+args = ["build", "--target", "thumbv7em-none-eabihf", "--profile", "@@decode(BUILD_TYPE,release,release,debug,dev)"]
+
+[tasks.component_bin]
+dependencies = ["component_elf", "make_build"]
+script = [
+  "arm-none-eabi-objcopy -O binary ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/rust_component ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/component.bin --strip-unneeded",
+  "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/component.bin build/max78000.bin"
+]
+
+[tasks.component_elf_copy]
+dependencies = ["make_build"]
+command = "cp"
+args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/rust_component", "build/max78000.elf"]
+
+[tasks.component_elf]
+run_task = { name = ["component_elf_build", "component_elf_copy"] }
+
+[tasks.make_build]
+command = "mkdir"
+args = ["-p", "build"]
+
+
+[tasks.cleanbin]
+script = [
+  "rm -rf build"
+]
+
+[tasks.all]
+dependencies = ["cleanbin", "buildall"]

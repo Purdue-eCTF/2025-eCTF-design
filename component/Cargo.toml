@@ -1,0 +1,29 @@
+[package]
+name = "rust_component"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-m = "0.7.7"
+cortex-m-rt = { version = "0.7.2", features = ["set-sp", "set-vtor"] }
+max78000_hal = { path = "../max78000_hal" }
+design_utils = { path = "../design_utils" }
+thiserror-no-std = "2.0.2"
+tinyvec = "1.6.0"
+serde = { version = "1.0", default-features = false }
+rand_core = { version = "0.6.4", default-features = false }
+rand_chacha = { version = "0.3.1", default-features = false }
+postcard = "1.0.8"
+
+[build-dependencies]
+chacha20poly1305 = "0.10.1"
+rand = "0.8.5"
+deployment = { path = "../deployment" }
+cc = "1.0"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+debug = true

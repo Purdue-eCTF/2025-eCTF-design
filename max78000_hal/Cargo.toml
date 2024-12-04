@@ -1,0 +1,13 @@
+[package]
+name = "max78000_hal"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+max78000_device = { path = "../max78000_device", features = ["rt", "critical-section"] }
+cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7.2"
+thiserror-no-std = "2.0.2"
+once_cell = { version = "1.19.0", default_features = false, features = ["critical-section"] }

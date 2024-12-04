@@ -1,0 +1,23 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Run
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+          IP: ${{ secrets.IP }}
+          PORT: ${{ secrets.PORT }}
+        run: python upload.py '${{ github.sha }}' '${{ github.actor }}' '${{ github.event.head_commit.message }}' '${{ github.run_id }}'

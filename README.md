@@ -1,12 +1,10 @@
-# Purdue ECTF 2024
-This repository contains all code related to Purdue's submission for ECTF 2024.
+# Purdue ECTF 2025
+This repository contains all code related to Purdue's submission for eCTF 2025.
 
 ## High-level overview
-This project is a secure implementation of a protocol for the MITRE eCTF challenge. We have been tasked with creating a system
-to verify the authenticity and integrity of chips on medical device end products. This device, referred to as a MISC (Medical Infrastructure Supply Chain)
-consists of one Application Processor (AP) and two Components. The AP is responsible for communicating with the components and 
-orchestrates all key functionality. An AP is designed to work with provisioned components whose binaries are built as part of the 
-same deployment and operated by a user. 
+[...]
+
+<!-- TODO: update this -->
 
 ## Documentation 📖
 Documentation and technical specifications can be found in the [docs](docs) directory.

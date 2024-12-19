@@ -211,6 +211,36 @@ impl Flash {
         let last_chunk_addr = align_down(address + data.len(), ADDR_ALIGN);
         self.write16(last_chunk_addr, &buf)
     }
+
+    pub fn lock_page(&mut self, page_address: usize) {
+        assert_eq!(page_address & PAGE_MASK, page_address, "address not page aligned");
+        assert!(
+            page_address >= FLASH_BASE_ADDR && page_address < FLASH_BASE_ADDR + FLASH_SIZE,
+            "address does not correspond to flash memory",
+        );
+
+        // this will be between 0-64 because of earlier checks
+        // device has 64 flash pages
+        let page_number = (page_address - FLASH_BASE_ADDR) / FLASH_PAGE_SIZE;
+
+        // flash lock registers have 2 32 bit registers, 1 for first 32 pages, 1 for next 32 pages
+        // least significant bit of each register is lowest page, then next bit next page, and so on
+
+        // calculate bit to set in register
+        let flash_lock_bit = 1u32 << (page_number % 32);
+
+        if page_number >= 32 {
+            // safety: any bit in welr0 register can be written to to lock a flash page
+            self.regs.welr0().write(|welr0| unsafe {
+                welr0.bits(flash_lock_bit)
+            });
+        } else {
+            // safety: any bit in welr0 register can be written to to lock a flash page
+            self.regs.welr1().write(|welr1| unsafe {
+                welr1.bits(flash_lock_bit)
+            });
+        }
+    }
 }
 
 // for some reason this is needed for flash to work

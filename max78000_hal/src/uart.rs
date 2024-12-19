@@ -12,17 +12,19 @@ const MAX_CLOCK_DIVISOR: u32 = (1 << 20) - 1;
 
 static UART: OnceCell<Uart> = OnceCell::new();
 
-/// Gets a reference to the uart.
+/// Gets a reference to the global uart.
 pub fn uart() -> &'static Uart {
     UART.get().expect("uart not yet initialized")
 }
 
+/// Used to send an receive data over uart port.
 #[derive(Debug)]
 pub struct Uart {
     regs: UART,
 }
 
 impl Uart {
+    /// Initialize the global uart.
     pub(crate) fn init(uart: UART) {
         let mut uart = Uart { regs: uart };
         uart.setup_uart();

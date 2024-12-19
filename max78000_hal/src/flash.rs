@@ -212,6 +212,13 @@ impl Flash {
         self.write16(last_chunk_addr, &buf)
     }
 
+    /// Locks a page in flash memory.
+    /// 
+    /// Locked pages cannot be written to or erased until device is reset.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if `page_address` is not the first address of a valid flash page.
     pub fn lock_page(&mut self, page_address: usize) {
         assert_eq!(page_address & PAGE_MASK, page_address, "address not page aligned");
         assert!(
@@ -235,7 +242,7 @@ impl Flash {
                 welr0.bits(flash_lock_bit)
             });
         } else {
-            // safety: any bit in welr0 register can be written to to lock a flash page
+            // safety: any bit in welr1 register can be written to to lock a flash page
             self.regs.welr1().write(|welr1| unsafe {
                 welr1.bits(flash_lock_bit)
             });

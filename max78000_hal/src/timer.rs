@@ -11,12 +11,14 @@ use crate::{Gcr, HalError};
 
 const SYSTICK_RELOAD_VAL: u32 = 0xffffff;
 
+/// Represents an instant in time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instant {
     time_since_boot: Duration,
 }
 
 impl Instant {
+    /// Get an instant for the current time.
     pub fn now() -> Instant {
         let (current_tick, wrap_count) = interrupt::free(|token| {
             let mut systick_ref = SYSTICK.borrow(token).borrow_mut();
@@ -68,6 +70,7 @@ impl Add<Duration> for Instant {
     }
 }
 
+/// Spins until the given duration has fully ellapsed.
 pub fn sleep(duration: Duration) {
     let start = Instant::now();
     let end = start + duration;

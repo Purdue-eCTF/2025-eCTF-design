@@ -4,26 +4,36 @@ use max78000_device::{interrupt, FLC};
 
 use crate::{align_down, Gcr, HalError};
 
+/// Size in bytes of a flash page on the max78000 board.
 pub const FLASH_PAGE_SIZE: usize = 0x2000;
+
+/// The required alignmant of each write to the max78000 flash memory.
 const ADDR_ALIGN: usize = 0x10;
 
 const ADDR_MASK: usize = !(ADDR_ALIGN - 1);
 pub const PAGE_MASK: usize = !(FLASH_PAGE_SIZE - 1);
 
+/// Start of flash memory in address space.
 pub const FLASH_BASE_ADDR: usize = 0x10000000;
+/// Size of flash memory.
 pub const FLASH_SIZE: usize = 0x80000;
 
+/// Used to interact with the max78000 flash memory.
+/// 
+/// Performs various fuctionality such as writing to and clearing flash.
 pub struct Flash {
     regs: FLC,
 }
 
 impl Flash {
+    /// Creates a new Flash instance from the flash controller registers.
     pub(crate) fn new(regs: FLC) -> Self {
         Flash {
             regs,
         }
     }
 
+    /// Busy waits until the flash controller reports all pending operations have finished.
     fn await_not_busy(&self) {
         let mut ctrl = self.regs.ctrl().read();
 
@@ -32,6 +42,7 @@ impl Flash {
         }
     }
 
+    /// Starts a flash operation by waiting for all other operations to finish, clearing errors, and unlocking controller.
     fn start_flash_operation(&mut self) {
         self.await_not_busy();
 
@@ -52,12 +63,17 @@ impl Flash {
         });
     }
 
+    /// Locks flash controller.
+    /// 
+    /// This means a cpu exception will be raised if any flash operations
+    /// are attempted to be performed while the controller is locked.
     fn lock_flash(&mut self) {
         self.regs.ctrl().modify(|_, ctrl| {
             ctrl.unlock().locked()
         });
     }
 
+    /// Checks if an error has occured with the flash controller, and clears the error if present.
     fn get_and_clear_error(&mut self) -> Result<(), HalError> {
         let mut error = Ok(());
 
@@ -82,6 +98,7 @@ impl Flash {
         }
     }
 
+    /// Set address to perform next flash operation on.
     fn set_address(&mut self, address: usize) {
         assert!(
             address >= FLASH_BASE_ADDR && address < FLASH_BASE_ADDR + FLASH_SIZE,
@@ -97,6 +114,15 @@ impl Flash {
         });
     }
 
+    /// Erases the page at the given address.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if address is not flash page aligned.
+    /// 
+    /// # Safety
+    /// 
+    /// Must not erase any page with executable code, or any page that a refrence currently points to.
     pub unsafe fn erase_page(&mut self, address: usize) -> Result<(), HalError> {
         assert_eq!(address & PAGE_MASK, address, "address not page aligned");
 
@@ -123,6 +149,10 @@ impl Flash {
     }
 
     /// Writes 16 bytes of data to a 16 byte aligned address
+    ///
+    /// # Safety
+    /// 
+    /// Must not write to any bytes with executable code, or any bytes that a refrence currently points to.
     pub unsafe fn write16(&mut self, address: usize, data: &[u8; 16]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
 
@@ -153,10 +183,13 @@ impl Flash {
         result
     }
 
-    /// Writes the bytes to the given address
+    /// Writes the bytes to the given address.
+    /// 
+    /// If the length is not 16 byte aligned, the extra bytes are filled with 0s
+    /// 
+    /// # Panics
     /// 
     /// Panics if the address i not 16 byte aligned
-    /// if the length is not 16 byte aligned, the extra bytes are filled with 0s
     pub unsafe fn write(&mut self, address: usize, data: &[u8]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
 
@@ -181,6 +214,7 @@ impl Flash {
 }
 
 // for some reason this is needed for flash to work
+// iirc hal macros expected interrupt handler to exist when compiling, but we don't need to handle flash interrupts ever
 #[allow(non_snake_case)]
 #[interrupt]
 fn FLASH_CONTROLLER() {}

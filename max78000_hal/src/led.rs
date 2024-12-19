@@ -1,6 +1,8 @@
 use crate::gpio::{Gpio, ConfigureIoOptions, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType};
 
+/// GPIO configurations for each color of led
 const LED_GPIO_PINS: [ConfigureIoOptions; 3] = [
+    // red
     ConfigureIoOptions {
         gpio_type: GpioType::Gpio2,
         pin_mask: 0b1,
@@ -8,6 +10,7 @@ const LED_GPIO_PINS: [ConfigureIoOptions; 3] = [
         pad: GpioPadConfig::None,
         voltage: GpioPinVoltage::Vddioh,
     },
+    // green
     ConfigureIoOptions {
         gpio_type: GpioType::Gpio2,
         pin_mask: 0b10,
@@ -15,6 +18,7 @@ const LED_GPIO_PINS: [ConfigureIoOptions; 3] = [
         pad: GpioPadConfig::None,
         voltage: GpioPinVoltage::Vddioh,
     },
+    // blue
     ConfigureIoOptions {
         gpio_type: GpioType::Gpio2,
         pin_mask: 0b100,
@@ -24,7 +28,7 @@ const LED_GPIO_PINS: [ConfigureIoOptions; 3] = [
     },
 ];
 
-
+/// Represents a certain color of led.
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 pub enum Led {
@@ -34,6 +38,9 @@ pub enum Led {
 }
 
 impl Led {
+    /// Converts integer index to specified led.
+    /// 
+    /// Mainly used for functions that c code calls.
     pub fn from_index(index: u32) -> Option<Led> {
         match index {
             0 => Some(Led::Red),
@@ -44,6 +51,7 @@ impl Led {
     }
 }
 
+/// Turns on the given led.
 pub fn led_on(led: Led) {
     let config = LED_GPIO_PINS[led as usize];
     Gpio::with(|gpio| {
@@ -51,6 +59,7 @@ pub fn led_on(led: Led) {
     });
 }
 
+/// Turns off the given led.
 pub fn led_off(led: Led) {
     let config = LED_GPIO_PINS[led as usize];
     Gpio::with(|gpio| {
@@ -58,6 +67,7 @@ pub fn led_off(led: Led) {
     });
 }
 
+/// Toggles the given led.
 pub fn led_toggle(led: Led) {
     let config = LED_GPIO_PINS[led as usize];
     Gpio::with(|gpio| {
@@ -65,6 +75,7 @@ pub fn led_toggle(led: Led) {
     });
 }
 
+/// Initializes led gpio pins.
 pub(crate) fn init() {
     Gpio::with(|gpio| {
         for config in LED_GPIO_PINS {

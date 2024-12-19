@@ -8,7 +8,9 @@ use crate::{ERTCO_FREQUENCY, EXTCLK_FREQUECNY, IBRO_FREQUENCY, INRO_FREQUENCY, I
 /// Stores gcr used by all peripherals
 static GCR: Mutex<RefCell<Option<Gcr>>> = Mutex::new(RefCell::new(None));
 
-/// Global configuration registers
+/// Global configuration registers.
+/// 
+/// Used for controlling certain global features of the device and enabling other peripherals and such.
 pub struct Gcr {
     regs: GCR,
     low_power_regs: LPGCR,
@@ -44,6 +46,7 @@ impl Gcr {
         })
     }
 
+    /// Gets the frequency of system clock in ticks per second.
     pub fn get_sysclock_frequency(&self) -> u32 {
         let clock_source = self.regs.clkctrl().read().sysclk_sel().variant()
             .expect("invalid system clock selected");
@@ -63,6 +66,7 @@ impl Gcr {
         frequency >> clock_divide
     }
 
+    /// Gets the frequency of the clock used for many peripherals in ticks per second.
     pub fn get_peripheral_clock_frequency(&self) -> u32 {
         self.get_sysclock_frequency() / 2
     }
@@ -79,6 +83,9 @@ impl Gcr {
         while self.regs.rst1().read().i2c1().bit() {}
     }
 
+    /// Enables the IBRO (Internal Baurd Rate Oscillator) clock.
+    /// 
+    /// This clock is used by the uart for timing purposes.
     pub fn enable_ibro_clock(&self) {
         self.regs.clkctrl().modify(|_, clckctrl| {
             // this might not be necessary
@@ -120,6 +127,7 @@ impl Gcr {
         });
     }
 
+    /// Flushes the instruction cache, and perhaps some other caches.
     pub fn flush_cache(&mut self) {
         self.regs.sysctrl().modify(|_, sysctrl| {
             sysctrl.icc0_flush().set_bit()

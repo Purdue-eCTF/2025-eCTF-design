@@ -344,6 +344,9 @@ impl MasterI2c {
         }
     }
 
+    /// Receives bytes from the given device with the given address.
+    /// 
+    /// Recieves exactly `buffer.len()` bytes.
     pub fn recv(&mut self, address: I2cAddr, buffer: &mut [u8]) -> Result<(), HalError> {
         assert!(buffer.len() <= MAX_I2C_MESSAGE_LEN);
         if buffer.len() == 0 {

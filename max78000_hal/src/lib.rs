@@ -42,6 +42,7 @@ pub enum HalError {
     CommittedArrayError(#[from] committed_array::CommittedArrayError),
 }
 
+/// Contains various peripheralls of the max78000 device.
 pub struct Peripherals {
     pub flash: Flash,
     pub i2c: UninitializedI2c,
@@ -49,6 +50,7 @@ pub struct Peripherals {
 }
 
 impl Peripherals {
+    /// Initializes all peripherals and returns them.
     pub fn take() -> Option<Peripherals> {
         let cortex_m::peripheral::Peripherals {
             SYST,

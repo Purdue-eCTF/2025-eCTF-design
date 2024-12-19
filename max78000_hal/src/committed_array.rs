@@ -22,6 +22,10 @@ pub enum CommittedArrayError {
     OutputBufferTooSmall,
 }
 
+/// Commited Array acts like an atomic array of bytes.
+/// 
+/// Use `try_commit` to save an array in the commited array.
+/// Use `try_take` to retrieve the value from the commited array and reset its value.
 pub struct CommittedArray {
     status: AtomicU8,
     inner: UnsafeCell<CommittedArrayData>,
@@ -33,6 +37,7 @@ struct CommittedArrayData {
 }
 
 impl CommittedArray {
+    /// Creates a new commited array
     pub const fn new() -> Self {
         CommittedArray {
             status: AtomicU8::new(EMPTY),
@@ -43,12 +48,21 @@ impl CommittedArray {
         }
     }
 
+    /// Returns a reference to the underlying commited array
+    /// 
+    /// # Safety
+    /// 
+    /// No other mutable reference to the commited array,
+    /// and no other reference immutable or not can exist when this is called.
     unsafe fn inner(&self) -> &mut CommittedArrayData {
         unsafe {
             self.inner.get().as_mut().unwrap()
         }
     }
 
+    /// Copies the data from the given slice into the commited array.
+    /// 
+    /// Returns an error if the commited array already has data stored in it.
     pub fn try_commit(&self, data: &[u8]) -> Result<(), CommittedArrayError> {
         if data.len() > COMMITTED_ARRAY_CAPACITY {
             return Err(CommittedArrayError::InputTooBig);
@@ -73,6 +87,13 @@ impl CommittedArray {
         Ok(())
     }
 
+    /// Retrieves data from the commited array and copies it into buf.
+    /// 
+    /// Returns an errror if the commited array does not have any data.
+    /// 
+    /// # Returns
+    /// 
+    /// A reference to the portion of buf which contains the data.
     pub fn try_take<'a>(&self, buf: &'a mut [u8]) -> Result<&'a [u8], CommittedArrayError> {
         self.status.compare_exchange(
             FULL,

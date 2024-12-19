@@ -5,34 +5,49 @@ use max78000_device::{GPIO0, GPIO2};
 
 use crate::gcr::Gcr;
 
+/// Specifies which GPIO controller to use.
 #[derive(Debug, Clone, Copy)]
 pub enum GpioType {
+    // GPIO0
     Gpio0,
+    // GPIO2
     Gpio2,
 }
 
+/// Specifies function of the gpio pin.
 #[derive(Debug, Clone, Copy)]
 pub enum GpioPinFunction {
+    /// Gpio pin is used for input.
     Input,
+    /// Gpio pin is used for output.
     Output,
+    /// Gpio pin is used for alternative function and used by some other device.
     Alternate1,
 }
 
+/// Controls voltage source for gpio pins.
 #[derive(Debug, Clone, Copy)]
 pub enum GpioPinVoltage {
+    /// Regular voltage.
     Vddio,
+    /// High voltage.
     Vddioh,
 }
 
+/// Controls the configuration of pullup and pulldown resisters and such for gpio pins.
 #[derive(Debug, Clone, Copy)]
 pub enum GpioPadConfig {
+    /// No resisters.
     None,
+    /// Pullup resister will be used.
     PullUp,
 }
 
+/// Specifies configuration options for a GPIO pins.
 #[derive(Debug, Clone, Copy)]
 pub struct ConfigureIoOptions {
     pub gpio_type: GpioType,
+    /// pin mask is a bitmask of pins, where each set bit indicates a pin to be configured.
     pub pin_mask: u32,
     pub function: GpioPinFunction,
     pub pad: GpioPadConfig,
@@ -41,12 +56,14 @@ pub struct ConfigureIoOptions {
 
 static GPIO: Mutex<RefCell<Option<Gpio>>> = Mutex::new(RefCell::new(None));
 
+/// Used for interacting with gpio pin controllers.
 pub struct Gpio {
     gpio0: GPIO0,
     gpio2: GPIO2,
 }
 
 impl Gpio {
+    /// Create a new GPIO instance.
     fn new(gpio0: GPIO0, gpio2: GPIO2) -> Self {
         Gcr::with(|gcr| {
             gcr.set_gpio0_clock_enabled(true);
@@ -59,6 +76,7 @@ impl Gpio {
         }
     }
 
+    /// Initializes the global `Gpio` instance.
     pub fn init(gpio0: GPIO0, gpio2: GPIO2) {
         interrupt::free(|token| {
             let mut gpio = GPIO.borrow(token).borrow_mut();
@@ -68,6 +86,7 @@ impl Gpio {
         })
     }
 
+    /// Get mutable access to the Gpio instance and call the given closure with it.
     pub fn with(f: impl FnOnce(&mut Gpio)) {
         interrupt::free(|token| {
             let mut gpio = GPIO.borrow(token).borrow_mut();
@@ -196,6 +215,7 @@ macro_rules! make_configure_io {
 }
 
 impl Gpio {
+    /// Configure pins based on the given configuration options.
     pub fn configure_io(&mut self, options: ConfigureIoOptions) {
         match options.gpio_type {
             GpioType::Gpio0 => make_configure_io!(self.gpio0, options),
@@ -203,6 +223,7 @@ impl Gpio {
         }
     }
 
+    /// Sets the output of all pins in the bitmask given by `pins` on the given controller `gpio_type` to high.
     pub fn output_set(&mut self, gpio_type: GpioType, pins: u32) {
         match gpio_type {
             GpioType::Gpio0 => {
@@ -220,6 +241,7 @@ impl Gpio {
         }
     }
 
+    /// Sets the output of all pins in the bitmask given by `pins` on the given controller `gpio_type` to low.
     pub fn output_clear(&mut self, gpio_type: GpioType, pins: u32) {
         match gpio_type {
             GpioType::Gpio0 => {
@@ -237,6 +259,7 @@ impl Gpio {
         }
     }
 
+    /// Toggles the output of all pins in the bitmask given by `pins` on the given controller `gpio_type`.
     pub fn output_toggle(&mut self, gpio_type: GpioType, pins: u32) {
         match gpio_type {
             GpioType::Gpio0 => {

@@ -12,6 +12,7 @@ const MAX_CLOCK_DIVISOR: u32 = (1 << 20) - 1;
 
 static UART: OnceCell<Uart> = OnceCell::new();
 
+/// Gets a reference to the uart.
 pub fn uart() -> &'static Uart {
     UART.get().expect("uart not yet initialized")
 }

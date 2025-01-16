@@ -1,7 +1,30 @@
-FROM --platform=linux/amd64 nixos/nix:2.19.3
+# FROM ubuntu:24.04
+FROM rust:1.84.0-bullseye
 
-ENV NIX_CONFIG="filter-syscalls = false"
-RUN nix-channel --update
+LABEL version="0.1"
+LABEL description="Purdue 2025 eCTF"
 
-COPY . ectf
+ARG DEBIAN_FRONTEND=noninteractive
+WORKDIR /root
 
+# Install Requisite Packages
+# do this first because it takes the longest
+RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+    gdb \
+    gdb-multiarch \
+    gcc-arm-none-eabi \
+    binutils-arm-none-eabi \
+    make \
+    python3.10 \
+    git \
+    wget \
+    libtool \
+    texinfo \
+    unzip    
+
+WORKDIR /decoder
+
+ENTRYPOINT ["bash", "-c", "make release DECODER_ID=${DECODER_ID} && cp build/max78000.elf build/max78000.bin /out"]
+
+# Sample run command:
+# docker run --rm -v ./build_out:/out -v ./:/decoder -v ./secrets:/secrets -e DECODER_ID=0xdeadbeef decoder

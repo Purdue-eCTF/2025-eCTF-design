@@ -39,7 +39,7 @@ fn main() {
     // let component_keypairs = secret_db.get_all_component_keypairs()
     //     .expect("could not get component keypairs");
 
-    // let mut rust_code = String::new();
+    let mut rust_code = String::new();
 
     // for line in ectf_params.lines().map(str::trim) {
     //     let mut parser = LineParser {
@@ -126,93 +126,72 @@ fn main() {
     // }
     // rust_code.push_str("];\n");
 
-    // // this start address is pass the end of the address max size binary can load to from bootloader
-    // // (0x10046000) there is an extra page in between just in case
-    // let flash_data_range_start = 0x10048000;
-    // let flash_data_range_end = 0x1007c000;
-    // // the address where we store state that can change in flash at
-    // // must be multiple of 128
-    // let flash_data_addr = rand::thread_rng()
-    //     .gen_range((flash_data_range_start / 128)..(flash_data_range_end / 128)) * 128;
+    // this start address is pass the end of the address max size binary can load to from bootloader
+    // (0x10046000) there is an extra page in between just in case
+    let flash_data_range_start = 0x10048000;
+    let flash_data_range_end = 0x1007c000;
+    // the address where we store state that can change in flash at
+    // must be multiple of 128
+    let flash_data_addr = rand::thread_rng()
+        .gen_range((flash_data_range_start / 128)..(flash_data_range_end / 128)) * 128;
 
-    // rust_code.push_str(&format!("pub const FLASH_DATA_ADDR: usize = {flash_data_addr};\n"));
+    rust_code.push_str(&format!("pub const FLASH_DATA_ADDR: usize = {flash_data_addr};\n"));
 
-    // let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    // std::fs::write(out_path.join("ectf_params.rs"), rust_code).unwrap();
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    std::fs::write(out_path.join("ectf_params.rs"), rust_code).unwrap();
 
-    if env::var("TARGET").unwrap() == "thumbv7em-none-eabihf" {
-        let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    // do compile time aslr
+    let mut rng = rand::thread_rng();
 
-        let mut rng = rand::thread_rng();
+    let flash_length = 0x00038000;
+    let ram_length = 0x00020000;
+    let flash_origin = 0x1000e000;
+    let ram_origin = 0x20000000;
 
-        let flash_length = 0x00038000;
-        let ram_length = 0x00020000;
-        let flash_origin = 0x1000e000;
-        let ram_origin = 0x20000000;
+    
+    let stack_start = ram_origin + (ram_length/4) + gen_addr(0, ram_length / 2, &mut rng);
+    
+    let sentry = 0x1000e200;
+    
+    // by default ap is 192 - 193 kib
+    // this leaves about 12 kib of extra space in maximum size
+    let textoffset = gen_addr(0, 0x4000, &mut rng);
+    let rodataoffset = 0;
+    let dataoffset = gen_addr(0, 0x1000, &mut rng);
+    let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
 
+
+    let memory_x = format!("
+        MEMORY {{
+            /* ROM        (rx) : ORIGIN = 0x00000000, LENGTH = 0x00010000 */
+            FLASH      (rx) : ORIGIN = {flash_origin:#x}, LENGTH = {flash_length:#x} /* 448KB Flash */
+            RAM      (rwx) : ORIGIN = {ram_origin:#x}, LENGTH = {ram_length:#x} /* 128kB SRAM */
+        }}
         
-        let stack_start = ram_origin + (ram_length/4) + gen_addr(0, ram_length / 2, &mut rng);
-        
-        let sentry = 0x1000e200;
-        
-        // by default ap is 192 - 193 kib
-        // this leaves about 12 kib of extra space in maximum size
-        let textoffset = gen_addr(0, 0x4000, &mut rng);
-        let rodataoffset = 0;
-        let dataoffset = gen_addr(0, 0x1000, &mut rng);
-        let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
+        /* Bootloader jumps to this address to start the ap */
+        _sentry = {sentry:#x};
 
+        rodataoffset = {rodataoffset:#x};
 
-        let memory_x = format!("
-            MEMORY {{
-                /* ROM        (rx) : ORIGIN = 0x00000000, LENGTH = 0x00010000 */
-                FLASH      (rx) : ORIGIN = {flash_origin:#x}, LENGTH = {flash_length:#x} /* 448KB Flash */
-                RAM      (rwx) : ORIGIN = {ram_origin:#x}, LENGTH = {ram_length:#x} /* 128kB SRAM */
-            }}
-            
-            /* Bootloader jumps to this address to start the ap */
-            _sentry = {sentry:#x};
+        _stack_start = {stack_start:#x};
+        dataoffset = {dataoffset:#x};
+        bssoffset = {bssoffset:#x};
+        textoffset = {textoffset:#x};
+    ");
+    
+    
+    File::create(out_path.join("memory.x"))
+        .unwrap()
+        .write_all(memory_x.as_bytes())
+        .unwrap();
 
-            rodataoffset = {rodataoffset:#x};
+    println!("cargo:rustc-link-search={}", out_path.display());
 
-            _stack_start = {stack_start:#x};
-            dataoffset = {dataoffset:#x};
-            bssoffset = {bssoffset:#x};
-            textoffset = {textoffset:#x};
-        ");
-        
-        
-        File::create(out.join("memory.x"))
-            .unwrap()
-            .write_all(memory_x.as_bytes())
-            .unwrap();
+    println!("cargo:rustc-link-arg=--nmagic");
 
-        println!("cargo:rustc-link-search={}", out.display());
-
-        println!("cargo:rustc-link-arg=--nmagic");
-
-        // FIXME: make sure we are not accidently using cortex-m-rt linker script
-        println!("cargo:rustc-link-arg=-Tlink.x");
-        println!("cargo:rerun-if-changed=link.x");
-    }
-
-    // let mut post_boot_build = cc::Build::new();
-    // post_boot_build
-    //     .target("thumbv7em-none-eabihf")
-    //     .compiler("arm-none-eabi-gcc")
-    //     .include("./post_boot")
-    //     .flag("-w")
-    //     .define("gcc", None)
-    //     .file("./post_boot/post_boot.c");
-
-    // if let Some("1") = env::var("POST_BOOT_ENABLED").ok().as_deref() {
-    //     let post_boot_code = env::var("POST_BOOT_CODE")
-    //         .expect("POST_BOOT_CODE not defined even when post boot code was enabled");
-
-    //     post_boot_build.define("POST_BOOT", Some(post_boot_code.trim_matches('\'')));
-    // }
-
-    // post_boot_build.compile("post_boot");
+    // FIXME: make sure we are not accidently using cortex-m-rt linker script
+    println!("cargo:rustc-link-arg=-Tlink.x");
+    println!("cargo:rerun-if-changed=link.x");
 }
 
 // struct HashResult {

@@ -15,29 +15,31 @@ command = "cargo"
 args = ["build", "--target", "thumbv7em-none-eabihf", "--profile", "@@decode(BUILD_TYPE,release,release,debug,dev)"]
 
 [tasks.ap_bin]
-dependencies = ["ap_elf", "make_build"]
+# dependencies = ["ap_elf", "make_build"]
+dependencies = ["ap_elf"]
 script = [
-  "arm-none-eabi-objcopy -O binary ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/rust_ap ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/ap.bin --strip-unneeded",
-  "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/ap.bin build/max78000.bin"
+  "arm-none-eabi-objcopy -O binary ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin --strip-unneeded",
+  "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin ../build_out/max78000.bin"
 ]
 
 [tasks.ap_elf_copy]
-dependencies = ["make_build"]
+# dependencies = ["make_build"]
 command = "cp"
-args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/rust_ap", "build/max78000.elf"]
+args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder", "../build_out/max78000.elf"]
 
 [tasks.ap_elf]
 run_task = { name = ["ap_elf_build", "ap_elf_copy"] }
 
-[tasks.make_build]
-command = "mkdir"
-args = ["-p", "build"]
+# [tasks.make_build]
+# command = "mkdir"
+# args = ["-p", "../build_out"]
 
 
-[tasks.cleanbin]
-script = [
-  "rm -rf build"
-]
+# [tasks.cleanbin]
+# script = [
+#   "rm -rf build"
+# ]
 
 [tasks.all]
-dependencies = ["cleanbin", "buildall"]
+# dependencies = ["cleanbin", "buildall"]
+dependencies = ["buildall"]

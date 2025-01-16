@@ -1,5 +1,5 @@
 [package]
-name = "rust_ap"
+name = "decoder"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,9 +18,7 @@ serde = { version = "1.0", default-features = false }
 
 [build-dependencies]
 bcrypt = "0.15.0"
-deployment = { path = "../deployment" }
 rand = "0.8.5"
-cc = "1.0"
 
 [profile.dev]
 panic = "abort"

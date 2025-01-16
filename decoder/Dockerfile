@@ -26,7 +26,7 @@ RUN cargo install --force cargo-make
 
 WORKDIR /decoder
 
-ENTRYPOINT ["bash", "-c", "cd application_processor/ && cargo make -e BUILD_TYPE=release -e CARGO_TARGET_DIR=${CURDIR}/target ap --verbose"]
+ENTRYPOINT ["bash", "-c", "cd decoder/ && cargo make -e BUILD_TYPE=release -e CARGO_TARGET_DIR=${CURDIR}/target ap --verbose"]
 
 # Sample run command:
 # docker run --rm -v ./build_out:/out -v ./:/decoder -v ./secrets:/secrets -e DECODER_ID=0xdeadbeef decoder

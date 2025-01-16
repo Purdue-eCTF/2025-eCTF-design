@@ -24,6 +24,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 
 RUN cargo install --force cargo-make
 
+# install toolchain in dockerfile so it does not need to be installed on every compilation
+RUN rustup toolchain install --component rustfmt --component rustc-dev --target thumbv7em-none-eabihf --profile minimal nightly-2024-02-19
+
 WORKDIR /decoder
 
 ENTRYPOINT ["bash", "-c", "cd decoder/ && cargo make -e BUILD_TYPE=release -e CARGO_TARGET_DIR=${CURDIR}/target ap --verbose"]

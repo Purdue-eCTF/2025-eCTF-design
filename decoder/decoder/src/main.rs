@@ -16,15 +16,10 @@ use max78000_hal::timer::sleep;
 use design_utils::{ComponentId, DesignUtilsError};
 use design_utils::messages::ProtocolError;
 
-use ap_driver::ApDriver;
+use decoder_driver::DecoderDriver;
 
-mod ap_driver;
-mod list;
-mod attest;
-mod boot;
+mod decoder_driver;
 mod ectf_params;
-mod post_boot;
-mod replace;
 
 #[derive(Debug, Error)]
 pub enum ApError {
@@ -64,7 +59,7 @@ fn main() -> ! {
         cortex_m::interrupt::enable();
     }
 
-    let mut driver = Some(ApDriver::new());
+    let mut driver = Some(DecoderDriver::new());
     sleep(Duration::from_millis(950));
 
     led_on(Led::Blue);
@@ -72,37 +67,37 @@ fn main() -> ! {
     let mut command_buf = [0u8; 16];
 
     loop {
-        let Some(command) = recv_input_with_message("Enter Command: ", &mut command_buf) else {
-            uprintln_error!("Unrecognized command");
-            continue;
-        };
+        // let Some(command) = recv_input_with_message("Enter Command: ", &mut command_buf) else {
+        //     uprintln_error!("Unrecognized command");
+        //     continue;
+        // };
 
-        let command = command.trim();
+        // let command = command.trim();
 
-        uprintln_debug!("running command: {command}");
+        // uprintln_debug!("running command: {command}");
 
-        let result = match command {
-            "list" => list::scan_components(driver.as_mut().unwrap()),
-            "attest" => attest::attest(driver.as_mut().unwrap()),
-            "replace" => replace::replace(driver.as_mut().unwrap()),
-            "boot" => boot::attempt_boot(&mut driver),
-            &_ => Err(ApError::InvalidCommand),
-        };
+        // let result = match command {
+        //     "list" => list::scan_components(driver.as_mut().unwrap()),
+        //     "attest" => attest::attest(driver.as_mut().unwrap()),
+        //     "replace" => replace::replace(driver.as_mut().unwrap()),
+        //     "boot" => boot::attempt_boot(&mut driver),
+        //     &_ => Err(ApError::InvalidCommand),
+        // };
 
-        if let Err(_error) = result {
-            //uprintln_error!("{command}: {error}");
-            uprintln_error!("{command}");
-        }
+        // if let Err(_error) = result {
+        //     //uprintln_error!("{command}: {error}");
+        //     uprintln_error!("{command}");
+        // }
     }
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    /*led_on(Led::Red);
+fn panic(info: &PanicInfo) -> ! {
+    led_on(Led::Red);
     led_off(Led::Green);
     led_off(Led::Blue);
 
-    uprintln_error!("Panic: {info}");*/
+    uprintln_error!("Panic: {info}");
 
     loop {}
 }

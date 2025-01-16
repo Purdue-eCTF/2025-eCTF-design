@@ -1,12 +1,9 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
-use std::convert::Infallible;
 use std::env;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-
-use bcrypt::bcrypt;
 
 pub fn force_rerun() {
     let mut file = OpenOptions::new().create(true).write(true).open(".cargo_build_rs_rerun")

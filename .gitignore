@@ -391,3 +391,6 @@ max78000_hal/Cargo.lock
 macro_test/
 
 .cargo_build_rs_rerun
+
+secrets/
+

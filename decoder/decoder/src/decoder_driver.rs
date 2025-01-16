@@ -9,13 +9,13 @@ use design_utils::{component_id_to_i2c_addr, messages::ProtocolError, I2C_FREQUE
 use rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
-use crate::ectf_params::{COMPONENTS, FLASH_DATA_ADDR};
+use crate::ectf_params::FLASH_DATA_ADDR;
 use crate::ApError;
 
 pub const FLASH_MAGIC: u32 = 0xdeadbeef;
 pub const FLASH_DATA: *const FlashData = FLASH_DATA_ADDR as *const FlashData;
 
-pub struct ApDriver {
+pub struct DecoderDriver {
     flash: Flash,
     i2c: MasterI2c,
     trng: Trng,
@@ -24,7 +24,7 @@ pub struct ApDriver {
     i2c_recv_buffer: [u8; MAX_I2C_MESSAGE_LEN],
 }
 
-impl ApDriver {
+impl DecoderDriver {
     pub fn new() -> Self {
         let Peripherals {
             flash,
@@ -35,7 +35,7 @@ impl ApDriver {
         let i2c = i2c.init_master(I2C_FREQUENCY);
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
 
-        ApDriver {
+        DecoderDriver {
             flash,
             i2c,
             trng,
@@ -58,8 +58,8 @@ impl ApDriver {
             // if flash is not initialized, component ids we are provisioned for
             if flash_data.flash_magic != FLASH_MAGIC {
                 flash_data.flash_magic = FLASH_MAGIC;
-                flash_data.components_len = COMPONENTS.len();
-                flash_data.components[..COMPONENTS.len()].copy_from_slice(COMPONENTS.as_slice());
+                //flash_data.components_len = COMPONENTS.len();
+                //flash_data.components[..COMPONENTS.len()].copy_from_slice(COMPONENTS.as_slice());
             }
 
             self.flash_data = Some(flash_data);

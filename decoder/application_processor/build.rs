@@ -9,6 +9,15 @@ use rand::Rng;
 use bcrypt::bcrypt;
 use deployment::{force_rerun, generate_random_bytes, parse_component_id, SecretDb, LineParser};
 
+pub fn force_rerun() {
+    let mut file = OpenOptions::new().create(true).write(true).open(".cargo_build_rs_rerun")
+        .expect("could not create rerun file");
+
+    write!(file, "a").unwrap();
+
+    println!("cargo:rerun-if-changed=.cargo_build_rs_rerun");
+}
+
 /*
  * Generate an address that is a multiple of 8
  * (Most need to be a multiple of 4, but stack needs to be a multiple of 8) 

@@ -1,10 +1,14 @@
 from Crypto.Random import get_random_bytes
+from Crypto.Signature import eddsa
 from dataclasses import dataclass
 from typing import Self, Dict, List
 import json
 
 def random(n: int) -> bytes:
     return get_random_bytes(n)
+
+def bytes_to_eddsa_key(key: bytes) -> eddsa.EdDSASigScheme:
+    return eddsa.new(eddsa.import_private_key(key), "rfc8032")
 
 @dataclass
 class ChannelKey:
@@ -16,6 +20,9 @@ class ChannelKey:
 
     # Ed25519 private key used to sign tv frames.
     private_key: bytes
+
+    def signing_key(self) -> eddsa.EdDSASigScheme:
+        return bytes_to_eddsa_key(self.private_key)
 
     @classmethod
     def generate(cls) -> Self:
@@ -35,6 +42,9 @@ class GlobalSecrets:
     subscribe_private_key: bytes
 
     channels: Dict[int, ChannelKey]
+
+    def subscribe_signing_key(self) -> eddsa.EdDSASigScheme:
+        return bytes_to_eddsa_key(self.subscribe_private_key)
 
     @classmethod
     def generate(cls, channel_ids: List[int]) -> Self:

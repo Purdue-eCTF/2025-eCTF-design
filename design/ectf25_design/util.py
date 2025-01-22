@@ -76,10 +76,10 @@ class GlobalSecrets:
         data = json.loads(data)
 
         return cls(
-            subscribe_root_key = data["subscribe_root_key"],
-            subscribe_private_key = data["subscribe_private_key"],
+            subscribe_root_key = bytes.fromhex(data["subscribe_root_key"]),
+            subscribe_private_key = bytes.fromhex(data["subscribe_private_key"]),
             channels = {id: Channel(
-                root_key = channel_json["root_key"],
-                private_Key = channel_json["private_key"],
+                root_key = bytes.fromhex(channel_json["root_key"]),
+                private_Key = bytes.fromhex(channel_json["private_key"]),
             ) for id, channel_json in data["channels"]}
         )

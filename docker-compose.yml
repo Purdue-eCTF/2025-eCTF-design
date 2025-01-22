@@ -3,7 +3,6 @@ services:
     build:
       context: ./decoder
       dockerfile: Dockerfile
-    image: decoder
     environment:
       - DECODER_ID=0xdeadbeef
     volumes:

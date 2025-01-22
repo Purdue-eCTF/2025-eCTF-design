@@ -1,0 +1,12 @@
+services:
+  decoder:
+    build:
+      context: ./decoder
+      dockerfile: Dockerfile
+    image: decoder
+    environment:
+      - DECODER_ID=0xdeadbeef
+    volumes:
+      - ./build_out:/build_out
+      - ./decoder:/decoder
+      - ./secrets:/secrets

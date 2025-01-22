@@ -4,6 +4,8 @@
 .vscode/
 **/gcc
 
+build_out
+
 !device/lib
 
 ## Begin Generic .gitignore ##

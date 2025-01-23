@@ -1,6 +1,8 @@
-# eCTF Insecure Example
+# eCTF Purdue3 design
 
-This repository holds the insecure example design for an eCTF Satellite TV System.
+This repository holds Purdue3's design for an eCTF Satellite TV System.
+
+TODO: fix this file
 
 ## Layout
 

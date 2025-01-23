@@ -1,5 +1,5 @@
-# application_procesor
-Application processor source code.
+# decoder
+Decoder source code.
 
 ## Files
 - `post_boot` - Post-boot messaging protocol.

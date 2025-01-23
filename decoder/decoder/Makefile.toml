@@ -3,32 +3,30 @@ BUILD_TYPE="release"
 
 [tasks.buildall]
 dependencies = [
-  "ap",
+  "decoder",
 ]
 
-[tasks.ap]
-dependencies = ["ap_elf", "ap_bin"]
+[tasks.decoder]
+dependencies = ["decoder_elf", "decoder_bin"]
 
 
-[tasks.ap_elf_build]
+[tasks.decoder_elf_build]
 command = "cargo"
 args = ["build", "--target", "thumbv7em-none-eabihf", "--profile", "@@decode(BUILD_TYPE,release,release,debug,dev)"]
 
-[tasks.ap_bin]
-# dependencies = ["ap_elf", "make_build"]
-dependencies = ["ap_elf"]
+[tasks.decoder_bin]
+dependencies = ["decoder_elf"]
 script = [
   "arm-none-eabi-objcopy -O binary ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin --strip-unneeded",
   "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin /build_out/max78000.bin"
 ]
 
-[tasks.ap_elf_copy]
-# dependencies = ["make_build"]
+[tasks.decoder_elf_copy]
 command = "cp"
 args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder", "/build_out/max78000.elf"]
 
-[tasks.ap_elf]
-run_task = { name = ["ap_elf_build", "ap_elf_copy"] }
+[tasks.decoder_elf]
+run_task = { name = ["decoder_elf_build", "decoder_elf_copy"] }
 
 # [tasks.make_build]
 # command = "mkdir"

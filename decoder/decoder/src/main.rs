@@ -135,15 +135,6 @@ impl Message {
         }
     }
 
-    pub fn new_with_data(opcode: Opcode, data: &[u8]) -> Self {
-        assert!(data.len() <= MAX_BODY_SIZE);
-
-        let mut buf = [0; MAX_BODY_SIZE];
-        buf[0..data.len()].copy_from_slice(data);
-
-        Self::new(opcode, data.len() as u16, buf)
-    }
-
     // TODO: better error handling
     #[inline]
     pub fn read_header() -> Result<Self, ()> {
@@ -267,10 +258,18 @@ fn flash_red(n: usize) {
 
 fn list_channels(context: &mut DecoderContext) {
     let channel_info = context.list_channels();
+    let channel_info_bytes = must_cast_slice(channel_info.as_slice());
 
-    let responce = Message::new_with_data(Opcode::List, must_cast_slice(channel_info.as_slice()));
+    let mut data = [0; MAX_BODY_SIZE];
+
+    // first 4 bytes is number of channels
+    data[0..4].copy_from_slice(&(channel_info.len() as u32).to_le_bytes());
+    // next bytes is info about channels
+    data[4..(4 + channel_info_bytes.len())].copy_from_slice(channel_info_bytes);
+
+    let response = Message::new(Opcode::List, (channel_info_bytes.len() + 4) as u16, data);
     // TODO: handle error
-    responce.write().unwrap();
+    response.write().unwrap();
 }
 
 #[entry]

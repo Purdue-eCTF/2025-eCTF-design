@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use bytemuck::checked::CheckedCastError;
+use bytemuck::{must_cast_slice, checked::CheckedCastError};
 use core::cmp::min;
 use core::fmt::Write;
 use core::panic::PanicInfo;
@@ -72,6 +72,7 @@ pub enum Opcode {
     Debug,
     Error,
 }
+
 impl TryFrom<u8> for Opcode {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, ()> {
@@ -86,6 +87,7 @@ impl TryFrom<u8> for Opcode {
         }
     }
 }
+
 impl Into<u8> for Opcode {
     fn into(self) -> u8 {
         match self {
@@ -98,6 +100,7 @@ impl Into<u8> for Opcode {
         }
     }
 }
+
 impl Opcode {
     #[allow(unused)]
     fn name(&self) -> &'static str {
@@ -111,10 +114,12 @@ impl Opcode {
         }
     }
 }
+
 const MAGIC: u8 = '%' as u8;
 const MAX_BODY_SIZE: usize = 1024;
 const CHUNK_SIZE: usize = 256;
 const NACKS: [Opcode; 2] = [Opcode::Debug, Opcode::Ack];
+
 pub struct Message {
     pub opcode: Opcode,
     pub length: u16,
@@ -129,6 +134,16 @@ impl Message {
             body,
         }
     }
+
+    pub fn new_with_data(opcode: Opcode, data: &[u8]) -> Self {
+        assert!(data.len() <= MAX_BODY_SIZE);
+
+        let mut buf = [0; MAX_BODY_SIZE];
+        buf[0..data.len()].copy_from_slice(data);
+
+        Self::new(opcode, data.len() as u16, buf)
+    }
+
     // TODO: better error handling
     #[inline]
     pub fn read_header() -> Result<Self, ()> {
@@ -152,6 +167,7 @@ impl Message {
             body: [0; MAX_BODY_SIZE],
         })
     }
+
     pub fn read() -> Result<Self, ()> {
         let reader = uart();
         let mut message = Self::read_header()?;
@@ -174,6 +190,7 @@ impl Message {
         let ack = Self::ack();
         ack.write_header();
     }
+
     pub fn read_ack() -> Result<(), ()> {
         let message = Self::read_header()?;
 
@@ -183,6 +200,7 @@ impl Message {
             Ok(())
         }
     }
+
     pub fn write_header(&self) {
         let writer = uart();
 
@@ -192,6 +210,7 @@ impl Message {
             writer.write_byte(b);
         }
     }
+
     pub fn write(&self) -> Result<(), ()> {
         self.write_header();
         if !NACKS.contains(&self.opcode) {
@@ -219,6 +238,7 @@ impl Message {
             body: [0; MAX_BODY_SIZE],
         }
     }
+
     pub fn debug(text: &str) -> Self {
         // need to use length of bytes because utf8 could mess up length
         let text_bytes = text.as_bytes();
@@ -244,6 +264,15 @@ fn flash_red(n: usize) {
         sleep(Duration::from_millis(250));
     }
 }
+
+fn list_channels(context: &mut DecoderContext) {
+    let channel_info = context.list_channels();
+
+    let responce = Message::new_with_data(Opcode::List, must_cast_slice(channel_info.as_slice()));
+    // TODO: handle error
+    responce.write().unwrap();
+}
+
 #[entry]
 fn main() -> ! {
     // safety: no critical sections depending on interrupts are currently held
@@ -256,12 +285,16 @@ fn main() -> ! {
     led_on(Led::Green);
 
     loop {
-        if let Ok(_message) = Message::read() {
-            let out_dbg = Message::debug("does it work??");
-            out_dbg.write().unwrap();
-            let list_msg = Message::new(Opcode::List, 4, [0; MAX_BODY_SIZE]);
-            list_msg.write().unwrap();
-            loop {}
+        if let Ok(message) = Message::read() {
+            match message.opcode {
+                Opcode::List => list_channels(&mut context),
+                _ => (),
+            }
+            // let out_dbg = Message::debug("does it work??");
+            // out_dbg.write().unwrap();
+            // let list_msg = Message::new(Opcode::List, 4, [0; MAX_BODY_SIZE]);
+            // list_msg.write().unwrap();
+            // loop {}
         }
     }
 }

@@ -6,8 +6,9 @@ use max78000_hal::{flash::PAGE_MASK, Flash, Peripherals};
 
 use rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use tinyvec::ArrayVec;
 
-use crate::ectf_params::FLASH_DATA_ADDR;
+use crate::ectf_params::{FLASH_DATA_ADDR, MAX_SUBSCRIPTIONS};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -90,31 +91,56 @@ impl<T: Pod> FlashEntry<T> {
     }
 }
 
+/// Data stored on flash for each subscription.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct SubscriptionEntry {
+    /// Start of subscription (inclusive)
     start_time: u64,
+    /// End of subscription (exlusive? TODO: figure out if inclusive or exclusive)
     end_time: u64,
+    /// Id of channel subscription is for
     channel_id: u32,
+    /// Number of internal nodes in subtree for deriving frame keys
     // bigger than needed for padding
     subtree_count: u32,
+    /// Public key for channel
     public_key: [u8; 32],
+    /// Internal nodes used to reconstruct frame keys
     // 126 is I beleive worse case scenario for how many subtrees we need
     subtrees: [KeySubtree; 128],
 }
 
+/// Represents information about one internal node in the key tree for a channel.
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct KeySubtree {
+    /// If timeatamp & mask == timestamp_value, timestamp is in this node
+    timestamp_value: u64,
     mask: u64,
+    /// Amount of bits to shift timestamp to the left after a match to start deriving key
     // bigger than needed for padding
     shift: u64,
+    /// Value of internal node used to derive keys
     key: [u8; 32],
 }
 
+/// Information about channel sent back to tv for list channels
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy, Default, Pod, Zeroable)]
+pub struct DecoderChannelInfo {
+    channel_id: u32,
+    start_time: u64,
+    end_time: u64,
+}
+
+/// Stores state of decoder.
 pub struct DecoderContext {
-    subscriptions: [FlashEntry<SubscriptionEntry>; 8],
+    /// Data for all subscriptions
+    subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
+    /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: u64,
+    /// PRNG used for random operations to help prevent glitching
     chacha: ChaCha20Rng,
 }
 
@@ -176,6 +202,25 @@ impl DecoderContext {
 
         // TODO: return error instead
         panic!("too many subscriptions");
+    }
+
+    /// Returns a list of info about all subscribed channels.
+    /// 
+    /// Used for the list functionality with tv.
+    pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfo; MAX_SUBSCRIPTIONS]> {
+        let mut out = ArrayVec::new();
+
+        for flash_entry in self.subscriptions.iter() {
+            if let Some(subscription) = flash_entry.get() {
+                out.push(DecoderChannelInfo {
+                    channel_id: subscription.channel_id,
+                    start_time: subscription.start_time,
+                    end_time: subscription.end_time,
+                });
+            }
+        }
+
+        out
     }
 
     /// Gets rng for random operations.

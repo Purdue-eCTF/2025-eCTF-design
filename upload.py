@@ -13,6 +13,10 @@ if __name__ == "__main__":
     conn.send(f"{os.environ['TOKEN']}|build-ours".encode())
     ack = conn.recv(1024).decode()
 
+    if not ack or "Invalid" in ack:
+        print("Connection error")
+        sys.exit(1)
+
     conn.send(f"{sys.argv[1]}|{sys.argv[2]}|{sys.argv[3]}|{sys.argv[4]}".encode())
 
     while True:

@@ -63,11 +63,11 @@ class GlobalSecrets:
     
     def to_json(self) -> str:
         return json.dumps({
-            "subscribe_root_key": self.subscribe_root_key.hex(),
-            "subscribe_private_key": self.subscribe_private_key.hex(),
+            "subscribe_root_key": list(self.subscribe_root_key),
+            "subscribe_private_key": list(self.subscribe_private_key),
             "channels": {id: {
-                "root_key": channel.root_key.hex(),
-                "private_key": channel.private_key.hex(),
+                "root_key": list(channel.root_key),
+                "private_key": list(channel.private_key),
             } for id, channel in self.channels.items()},
         })
     
@@ -76,10 +76,10 @@ class GlobalSecrets:
         data = json.loads(data)
 
         return cls(
-            subscribe_root_key = bytes.fromhex(data["subscribe_root_key"]),
-            subscribe_private_key = bytes.fromhex(data["subscribe_private_key"]),
+            subscribe_root_key = bytes(data["subscribe_root_key"]),
+            subscribe_private_key = bytes(data["subscribe_private_key"]),
             channels = {id: Channel(
-                root_key = bytes.fromhex(channel_json["root_key"]),
-                private_Key = bytes.fromhex(channel_json["private_key"]),
+                root_key = bytes(channel_json["root_key"]),
+                private_Key = bytes(channel_json["private_key"]),
             ) for id, channel_json in data["channels"]}
         )

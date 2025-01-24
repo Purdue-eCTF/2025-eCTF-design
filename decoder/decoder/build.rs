@@ -2,8 +2,12 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::env;
+use std::collections::HashMap;
+use serde::Deserialize;
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use argon2::{Argon2, Params};
+use ed25519_dalek::{SigningKey, SecretKey, PUBLIC_KEY_LENGTH};
 
 pub fn force_rerun() {
     let mut file = OpenOptions::new().create(true).write(true).open(".cargo_build_rs_rerun")
@@ -14,114 +18,81 @@ pub fn force_rerun() {
     println!("cargo:rerun-if-changed=.cargo_build_rs_rerun");
 }
 
-/*
- * Generate an address that is a multiple of 8
- * (Most need to be a multiple of 4, but stack needs to be a multiple of 8) 
- */
+/// Generate an address that is a multiple of 8.
+/// 
+/// Most need to be a multiple of 4, but stack needs to be a multiple of 8).
 fn gen_addr(start: u32, end: u32, rng: &mut ThreadRng) -> u32 {
     rng.gen_range((start/8 + 1)..(end/8)) * 8
+}
+
+/// Parse a string into 4 byte unsigned decoder id
+fn parse_decoder_id(n: &str) -> u32 {
+    if n.starts_with("0x") {
+        u32::from_str_radix(&n[2..], 16)
+            .expect("could not parse component id")
+    } else {
+        n.parse::<u32>()
+            .expect("could not parse component id")
+    }
+}
+
+fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH] {
+    SigningKey::from_bytes(private_key)
+        .verifying_key()
+        .to_bytes()
+}
+
+#[derive(Debug, Deserialize)]
+struct ChannelSecrets {
+    root_key: [u8; 32],
+    private_key: [u8; 32],
+}
+
+#[derive(Debug, Deserialize)]
+struct GlobalSecrets {
+    subscribe_root_key: [u8; 32],
+    subscribe_private_key: [u8; 32],
+    channels: HashMap<usize, ChannelSecrets>,
 }
 
 // this build script just parses ap ectf params from inc/ectf_params.h into a rust file $OUT_DIR/ectf_params.rs
 fn main() {
     force_rerun();
 
-    // let ectf_params = std::fs::read_to_string("inc/ectf_params.h")
-    //     .expect("no ectf params found");
+    let global_secrets = std::fs::read_to_string("/secrets/secrets.json")
+        .expect("could not find global secrets file");
+
+    let secrets: GlobalSecrets = serde_json::from_str(&global_secrets)
+        .expect("could not deserialize global secrets");
+
+    let decoder_id = parse_decoder_id(
+        &std::env::var("DECODER_ID")
+            .expect("Decoder ID not specified")
+    );
+
+    // first generate subscription key, which is using argon2
+    let hasher = Argon2::default();
+    let mut subscription_key = [0; Params::DEFAULT_OUTPUT_LEN];
+    hasher.hash_password_into(
+        &decoder_id.to_le_bytes(),
+        &secrets.subscribe_root_key,
+        &mut subscription_key,
+    ).expect("failed to create device subscription key");
 
 
-    // let secret_db = SecretDb::new("../secret_db.sqlite")
-    //     .expect("could not open the secret db");
-
-    // let component_keypairs = secret_db.get_all_component_keypairs()
-    //     .expect("could not get component keypairs");
-
+    // generate rust code with necessary constants
     let mut rust_code = String::new();
 
-    // for line in ectf_params.lines().map(str::trim) {
-    //     let mut parser = LineParser {
-    //         data: line,
-    //     };
+    rust_code.push_str(&format!("pub const DECODER_ID: u32 = {};\n", decoder_id));
 
-    //     if let Some("#define") = parser.take_token() {
-    //         match parser.take_token() {
-    //             Some("AP_PIN") => {
-    //                 let pin = parser.take_string().expect("no parameter for AP_ID");
+    let mut add_bytes = |name, data: &[u8]| {
+        rust_code.push_str(&format!("pub const {}: [u8; {}] = {:?};\n", name, data.len(), data));
+    };
 
-    //                 let HashResult {
-    //                     salt,
-    //                     hash,
-    //                 } = hash(pin, 8).expect("could not hash pin");
-
-    //                 rust_code.push_str(&format!("pub const PIN_HASH: [u8; {}] = {:?};\n", hash.len(), hash.as_slice()));
-    //                 rust_code.push_str(&format!("pub const PIN_SALT: [u8; {}] = {:?};\n", salt.len(), salt.as_slice()));
-    //             },
-    //             Some("AP_TOKEN") => {
-    //                 let token = parser.take_string().expect("no parameter for AP_TOKEN");
-
-    //                 let HashResult {
-    //                     salt,
-    //                     hash,
-    //                 } = hash(token, 8).expect("could not hash pin");
-
-    //                 rust_code.push_str(&format!("pub const TOKEN_HASH: [u8; {}] = {:?};\n", hash.len(), hash.as_slice()));
-    //                 rust_code.push_str(&format!("pub const TOKEN_SALT: [u8; {}] = {:?};\n", salt.len(), salt.as_slice()));
-    //             },
-    //             Some("COMPONENT_IDS") => {
-    //                 let mut ids = Vec::new();
-    //                 while let Some(id) = parser.take_token() {
-    //                     ids.push(id.trim_matches(','));
-    //                 }
-
-    //                 rust_code.push_str(&format!("pub const COMPONENTS: [ProvisionedComponent; {}] = [", ids.len()));
-
-    //                 for id in ids {
-    //                     let build_id = secret_db.get_component_keypair(parse_component_id(id))
-    //                         .expect("could not get component keypair")
-    //                         .build_id;
-
-    //                     let (key_index, _) = component_keypairs.iter()
-    //                         .enumerate()
-    //                         .filter(|(_, keypair)| keypair.build_id == build_id)
-    //                         .next()
-    //                         .expect("could not find key index for the given build_id");
-
-    //                     rust_code.push_str(&format!("ProvisionedComponent {{
-    //                         component_id: {id},
-    //                         key_index: {key_index:?},
-    //                     }}, "));
-    //                 }
-
-    //                 rust_code.push_str("];\n");
-    //             },
-    //             Some("AP_BOOT_MSG") => {
-    //                 let data = parser.take_string().expect("no parameter for AP_BOOT_MSG");
-
-    //                 rust_code.push_str(&format!("pub const AP_BOOT_MSG: &str = \"{}\";\n", data));
-    //             },
-    //             _ => (),
-    //         }
-    //     }
-    // }
-
-    // let global_secrets = secret_db.get_global_secrets()
-    //     .expect("could not get global secrets");
-
-    // rust_code.push_str(&format!("pub const HMAC_KEY: [u8; 32] = {:?};\n", global_secrets.hmac_key));
-    // rust_code.push_str(&format!("pub const ADATA_ENC_KEY: [u8; 32] = {:?};\n", global_secrets.attestation_data_enc_key));
-    // rust_code.push_str(&format!("pub const BOOT_CR_KEY: [u8; 32] = {:?};\n", global_secrets.boot_cr_key));
-    // rust_code.push_str(&format!("pub const BOOT_DATA_ENC_KEY: [u8; 32] = {:?};\n", global_secrets.boot_data_enc_key));
-    // rust_code.push_str(&format!("pub const AP_PUBKEY: [u8; 32] = {:?};\n", global_secrets.ap_keypair.pubkey));
-    // rust_code.push_str(&format!("pub const AP_PRIVKEY: [u8; 32] = {:?};\n", global_secrets.ap_keypair.privkey));
-
-    // rust_code.push_str(&format!("pub const COMPONENT_KEYS: [ComponentKey; {}] = [", component_keypairs.len()));
-    // for key in component_keypairs {
-    //     rust_code.push_str(&format!("ComponentKey {{
-    //         build_id: {:?},
-    //         pubkey: {:?},
-    //     }}, ", key.build_id, key.keypair.pubkey.as_slice()));
-    // }
-    // rust_code.push_str("];\n");
+    add_bytes("SUBSCRIPTION_ENC_KEY", &subscription_key);
+    add_bytes("SUBSCRIPTION_PUBLIC_KEY", &private_key_to_public_key(&secrets.subscribe_private_key));
+    add_bytes("CHANNEL0_ENC_KEY", &secrets.channels[&0].root_key);
+    add_bytes("CHANNEL0_PUBLIC_KEY", &private_key_to_public_key(&secrets.channels[&0].private_key));
 
     // this start address is pass the end of the address max size binary can load to from bootloader
     // (0x10046000) there is an extra page in between just in case

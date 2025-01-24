@@ -26,6 +26,11 @@ impl<T: Pod> FlashEntry<T> {
     ///
     /// `address` must be the address of the start of a flash page which is not in use by anything else (references to it, code on it, etc).
     unsafe fn new(address: usize) -> Self {
+        // make sure T is not too big
+        const {
+            assert!(size_of::<T>() <= FLASH_PAGE_SIZE - 16);
+        }
+
         assert_eq!(
             address & PAGE_MASK,
             address,
@@ -53,12 +58,12 @@ impl<T: Pod> FlashEntry<T> {
         self.status() == FLASH_ENTRY_MAGIC
     }
 
-    pub fn get(&self) -> Option<T> {
+    pub fn get(&self) -> Option<&T> {
         if self.has_object() {
             // trait bound AnyBitPattern ensures flash data valid for any bits
-            let object = unsafe { core::ptr::read(self.address as *const T) };
-
-            Some(object)
+            unsafe {
+                (self.address as *const T).as_ref()
+            }
         } else {
             None
         }
@@ -101,7 +106,7 @@ impl<T: Pod> FlashEntry<T> {
 pub struct SubscriptionEntry {
     /// Start of subscription (inclusive)
     start_time: u64,
-    /// End of subscription (exlusive? TODO: figure out if inclusive or exclusive)
+    /// End of subscription (inclusive)
     end_time: u64,
     /// Id of channel subscription is for
     channel_id: u32,
@@ -183,7 +188,7 @@ impl DecoderContext {
     }
 
     #[allow(unused)]
-    pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<SubscriptionEntry> {
+    pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<&SubscriptionEntry> {
         self.subscriptions
             .iter()
             .filter_map(|flash_entry| flash_entry.get())

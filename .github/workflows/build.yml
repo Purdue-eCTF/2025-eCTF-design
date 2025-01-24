@@ -22,4 +22,4 @@ jobs:
           PORT: ${{ secrets.PORT }}
           ACTOR: ${{ github.actor }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        run: python upload.py '${{ github.sha }}' "$ACTOR' "$COMMIT_MESSAGE" '${{ github.run_id }}'
+        run: python upload.py '${{ github.sha }}' "$ACTOR" "$COMMIT_MESSAGE" '${{ github.run_id }}'

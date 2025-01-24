@@ -1,17 +1,13 @@
 use core::{marker::PhantomData, slice};
-use core::time::Duration;
-use bytemuck::{must_cast_slice, AnyBitPattern, Pod, Zeroable};
+use bytemuck::{must_cast_slice, Pod, Zeroable};
 
 use max78000_hal::flash::FLASH_PAGE_SIZE;
-use serde::{Serialize, Deserialize};
-use max78000_hal::{flash::PAGE_MASK, i2c::{I2cAddr, MAX_I2C_MESSAGE_LEN}, Flash, MasterI2c, Peripherals, Trng, timer::sleep};
-use design_utils::{component_id_to_i2c_addr, messages::ProtocolError, I2C_FREQUENCY};
+use max78000_hal::{flash::PAGE_MASK, Flash, Peripherals};
 
-use rand_core::{RngCore, SeedableRng};
+use rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
 use crate::ectf_params::FLASH_DATA_ADDR;
-use crate::DecoderError;
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -69,12 +65,8 @@ impl<T: Pod> FlashEntry<T> {
     pub fn set(&mut self, object: &T) {
         let flash = Flash::get();
 
-        // safety: u8 slice is valid for any pattern of bits (technically not true for this, since uninit bytes, but probably fine right :))
-        // TODO: fix this issue
+        // convert object to bytes
         let data = must_cast_slice(slice::from_ref(object));
-        /*let data = unsafe {
-            slice::from_raw_parts(object as *const T as *const u8, size_of::<T>())
-        };*/
 
         // 16 bytes for status at end
         assert!(data.len() < FLASH_PAGE_SIZE - 16);
@@ -104,9 +96,8 @@ pub struct SubscriptionEntry {
     start_time: u64,
     end_time: u64,
     channel_id: u32,
-    subtree_count: u8,
-    _padding1: u8,
-    _padding2: u16,
+    // bigger than needed for padding
+    subtree_count: u32,
     public_key: [u8; 32],
     // 126 is I beleive worse case scenario for how many subtrees we need
     subtrees: [KeySubtree; 128],
@@ -116,13 +107,14 @@ pub struct SubscriptionEntry {
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct KeySubtree {
     mask: u64,
+    // bigger than needed for padding
     shift: u64,
     key: [u8; 32],
 }
 
 pub struct DecoderContext {
     subscriptions: [FlashEntry<SubscriptionEntry>; 8],
-    last_decoded_timestamp: u64,
+    pub last_decoded_timestamp: u64,
     chacha: ChaCha20Rng,
 }
 

@@ -1,11 +1,11 @@
-use core::{marker::PhantomData, slice};
 use bytemuck::{must_cast_slice, Pod, Zeroable};
+use core::{marker::PhantomData, slice};
 
 use max78000_hal::flash::FLASH_PAGE_SIZE;
 use max78000_hal::{flash::PAGE_MASK, Flash, Peripherals};
 
-use rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
 use crate::ectf_params::{FLASH_DATA_ADDR, MAX_SUBSCRIPTIONS};
@@ -20,12 +20,16 @@ pub struct FlashEntry<T: Pod> {
 
 impl<T: Pod> FlashEntry<T> {
     /// Creates a new `FlashEntry`.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// `address` must be the address of the start of a flash page which is not in use by anything else (references to it, code on it, etc).
     unsafe fn new(address: usize) -> Self {
-        assert_eq!(address & PAGE_MASK, address, "address is not flash page aligned");
+        assert_eq!(
+            address & PAGE_MASK,
+            address,
+            "address is not flash page aligned"
+        );
 
         FlashEntry {
             address,
@@ -41,9 +45,7 @@ impl<T: Pod> FlashEntry<T> {
         let ptr = self.status_address() as *const u32;
 
         // safety: address assumes to point to valid flash page, so this address is also on that page, and is a valid u32
-        unsafe {
-            core::ptr::read(ptr)
-        }
+        unsafe { core::ptr::read(ptr) }
     }
 
     pub fn has_object(&self) -> bool {
@@ -53,9 +55,7 @@ impl<T: Pod> FlashEntry<T> {
     pub fn get(&self) -> Option<T> {
         if self.has_object() {
             // trait bound AnyBitPattern ensures flash data valid for any bits
-            let object = unsafe {
-                core::ptr::read(self.address as *const T)
-            };
+            let object = unsafe { core::ptr::read(self.address as *const T) };
 
             Some(object)
         } else {
@@ -75,17 +75,20 @@ impl<T: Pod> FlashEntry<T> {
         unsafe {
             // erase page first
             // safety: no references should be at this page, since no references are returned on get
-            flash.erase_page(self.address)
+            flash
+                .erase_page(self.address)
                 .expect("failed to erase flash page");
 
             // write data
             // safety: write is to address which is assumed valid when constructing FlashEntry
-            flash.write(self.address, data)
+            flash
+                .write(self.address, data)
                 .expect("failed to write object data to flash");
 
             // write status after whole object written
             // safety: status resides within this flash page
-            flash.write(self.status_address(), &FLASH_ENTRY_MAGIC.to_ne_bytes())
+            flash
+                .write(self.status_address(), &FLASH_ENTRY_MAGIC.to_ne_bytes())
                 .expect("failed to write status to flash");
         }
     }
@@ -146,24 +149,24 @@ pub struct DecoderContext {
 
 impl DecoderContext {
     pub fn new() -> Self {
-        let Peripherals {
-            mut trng,
-            ..
-        } = Peripherals::take().expect("could not initialize peripherals");
+        let Peripherals { mut trng, .. } =
+            Peripherals::take().expect("could not initialize peripherals");
 
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
 
         // safety: FLASH_PAGE_SIZE generated at build time is verified to be correct
-        let subscriptions = unsafe {[
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 0),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 1),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 2),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 3),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 4),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 5),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 6),
-            FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 7),
-        ]};
+        let subscriptions = unsafe {
+            [
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 0),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 1),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 2),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 3),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 4),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 5),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 6),
+                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 7),
+            ]
+        };
 
         DecoderContext {
             subscriptions,
@@ -173,7 +176,8 @@ impl DecoderContext {
     }
 
     pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<SubscriptionEntry> {
-        self.subscriptions.iter()
+        self.subscriptions
+            .iter()
             .filter_map(|flash_entry| flash_entry.get())
             .filter(|subscription| subscription.channel_id == channel_id)
             .next()
@@ -205,7 +209,7 @@ impl DecoderContext {
     }
 
     /// Returns a list of info about all subscribed channels.
-    /// 
+    ///
     /// Used for the list functionality with tv.
     pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfo; MAX_SUBSCRIPTIONS]> {
         let mut out = ArrayVec::new();

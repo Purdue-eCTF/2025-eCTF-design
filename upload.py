@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn.connect((os.environ["IP"], int(os.environ["PORT"])))
-    conn.send(f"{os.environ['TOKEN']}|build-ours")
+    conn.send(f"{os.environ['TOKEN']}|build-ours".encode())
     ack = conn.recv(1024).decode()
 
     conn.send(f"{sys.argv[1]}|{sys.argv[2]}|{sys.argv[3]}|{sys.argv[4]}".encode())

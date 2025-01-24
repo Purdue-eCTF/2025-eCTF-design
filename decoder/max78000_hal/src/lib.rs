@@ -44,7 +44,6 @@ pub enum HalError {
 
 /// Contains various peripheralls of the max78000 device.
 pub struct Peripherals {
-    pub flash: Flash,
     pub i2c: UninitializedI2c,
     pub trng: Trng,
 }
@@ -72,12 +71,12 @@ impl Peripherals {
         Gcr::init(GCR, LPGCR);
         Gpio::init(GPIO0, GPIO2);
         Uart::init(UART);
+        Flash::init(FLC);
 
         timer::init(SYST);
         led::init();
 
         Some(Peripherals {
-            flash: Flash::new(FLC),
             i2c: UninitializedI2c::new(I2C1),
             trng: Trng::new(TRNG),
         })

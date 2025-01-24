@@ -16,9 +16,9 @@ use max78000_hal::uart::uart;
 use max78000_hal::HalError;
 use thiserror_no_std::Error;
 use utils::SliceWriteWrapper;
-use decoder_driver::DecoderDriver;
+use decoder_context::DecoderContext;
 
-mod decoder_driver;
+mod decoder_context;
 mod ectf_params;
 mod utils;
 
@@ -251,9 +251,10 @@ fn main() -> ! {
         cortex_m::interrupt::enable();
     }
 
-    let mut _driver = Some(DecoderDriver::new());
+    let mut context = DecoderContext::new();
     sleep(Duration::from_millis(100));
     led_on(Led::Green);
+
     loop {
         if let Ok(_message) = Message::read() {
             let out_dbg = Message::debug("does it work??");

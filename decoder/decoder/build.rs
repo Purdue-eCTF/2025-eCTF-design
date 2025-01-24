@@ -96,12 +96,13 @@ fn main() {
 
     // this start address is pass the end of the address max size binary can load to from bootloader
     // (0x10046000) there is an extra page in between just in case
+    // leave 8 pages after end, since we can have 8 pages of data
     let flash_data_range_start = 0x10048000;
-    let flash_data_range_end = 0x1007c000;
+    let flash_data_range_end = 0x1007c000 - 8 * 0x2000;
     // the address where we store state that can change in flash at
     // must be multiple of 128
     let flash_data_addr = rand::thread_rng()
-        .gen_range((flash_data_range_start / 128)..(flash_data_range_end / 128)) * 128;
+        .gen_range((flash_data_range_start / 0x2000)..(flash_data_range_end / 0x2000)) * 0x2000;
 
     rust_code.push_str(&format!("pub const FLASH_DATA_ADDR: usize = {flash_data_addr};\n"));
 

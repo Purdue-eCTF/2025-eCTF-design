@@ -1,6 +1,7 @@
 use core::ptr;
 
 use max78000_device::{interrupt, FLC};
+use once_cell::sync::OnceCell;
 
 use crate::{align_down, Gcr, HalError};
 
@@ -18,19 +19,32 @@ pub const FLASH_BASE_ADDR: usize = 0x10000000;
 /// Size of flash memory.
 pub const FLASH_SIZE: usize = 0x80000;
 
+static FLASH: OnceCell<Flash> = OnceCell::new();
+
 /// Used to interact with the max78000 flash memory.
 /// 
 /// Performs various fuctionality such as writing to and clearing flash.
+#[derive(Debug)]
 pub struct Flash {
     regs: FLC,
 }
 
 impl Flash {
+    /// Initializes global instance of flash controller
+    pub(crate) fn init(regs: FLC) {
+        FLASH.set(Self::new(regs))
+            .expect("could not setup flash");
+    }
+
     /// Creates a new Flash instance from the flash controller registers.
     pub(crate) fn new(regs: FLC) -> Self {
         Flash {
             regs,
         }
+    }
+
+    pub fn get() -> &'static Self {
+        FLASH.get().expect("flash not yet initialized")
     }
 
     /// Busy waits until the flash controller reports all pending operations have finished.
@@ -43,7 +57,7 @@ impl Flash {
     }
 
     /// Starts a flash operation by waiting for all other operations to finish, clearing errors, and unlocking controller.
-    fn start_flash_operation(&mut self) {
+    fn start_flash_operation(&self) {
         self.await_not_busy();
 
         // msdk sets clkdiv everytime
@@ -67,14 +81,14 @@ impl Flash {
     /// 
     /// This means a cpu exception will be raised if any flash operations
     /// are attempted to be performed while the controller is locked.
-    fn lock_flash(&mut self) {
+    fn lock_flash(&self) {
         self.regs.ctrl().modify(|_, ctrl| {
             ctrl.unlock().locked()
         });
     }
 
     /// Checks if an error has occured with the flash controller, and clears the error if present.
-    fn get_and_clear_error(&mut self) -> Result<(), HalError> {
+    fn get_and_clear_error(&self) -> Result<(), HalError> {
         let mut error = Ok(());
 
         self.regs.intr().modify(|val, intr| {
@@ -99,7 +113,7 @@ impl Flash {
     }
 
     /// Set address to perform next flash operation on.
-    fn set_address(&mut self, address: usize) {
+    fn set_address(&self, address: usize) {
         assert!(
             address >= FLASH_BASE_ADDR && address < FLASH_BASE_ADDR + FLASH_SIZE,
             "address does not correspond to flash memory",
@@ -123,7 +137,7 @@ impl Flash {
     /// # Safety
     /// 
     /// Must not erase any page with executable code, or any page that a refrence currently points to.
-    pub unsafe fn erase_page(&mut self, address: usize) -> Result<(), HalError> {
+    pub unsafe fn erase_page(&self, address: usize) -> Result<(), HalError> {
         assert_eq!(address & PAGE_MASK, address, "address not page aligned");
 
         self.start_flash_operation();
@@ -153,7 +167,7 @@ impl Flash {
     /// # Safety
     /// 
     /// Must not write to any bytes with executable code, or any bytes that a refrence currently points to.
-    pub unsafe fn write16(&mut self, address: usize, data: &[u8; 16]) -> Result<(), HalError> {
+    pub unsafe fn write16(&self, address: usize, data: &[u8; 16]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
 
         self.start_flash_operation();
@@ -190,7 +204,7 @@ impl Flash {
     /// # Panics
     /// 
     /// Panics if the address i not 16 byte aligned
-    pub unsafe fn write(&mut self, address: usize, data: &[u8]) -> Result<(), HalError> {
+    pub unsafe fn write(&self, address: usize, data: &[u8]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
 
         let chunks = data.chunks_exact(16);
@@ -219,7 +233,7 @@ impl Flash {
     /// # Panics
     /// 
     /// Panics if `page_address` is not the first address of a valid flash page.
-    pub fn lock_page(&mut self, page_address: usize) {
+    pub fn lock_page(&self, page_address: usize) {
         assert_eq!(page_address & PAGE_MASK, page_address, "address not page aligned");
         assert!(
             page_address >= FLASH_BASE_ADDR && page_address < FLASH_BASE_ADDR + FLASH_SIZE,
@@ -249,6 +263,12 @@ impl Flash {
         }
     }
 }
+
+// This is kindof a hack
+// Flash might get messed up if used in an interrupt for example
+// but no interrupts this year
+unsafe impl Send for Flash {}
+unsafe impl Sync for Flash {}
 
 // for some reason this is needed for flash to work
 // iirc hal macros expected interrupt handler to exist when compiling, but we don't need to handle flash interrupts ever

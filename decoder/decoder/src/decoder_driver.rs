@@ -10,7 +10,7 @@ use rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 
 use crate::ectf_params::FLASH_DATA_ADDR;
-use crate::ApError;
+use crate::DecoderError;
 
 pub const FLASH_MAGIC: u32 = 0xdeadbeef;
 pub const FLASH_DATA: *const FlashData = FLASH_DATA_ADDR as *const FlashData;
@@ -84,7 +84,7 @@ impl DecoderDriver {
         &mut self.chacha
     }
 
-    fn send_packet(&mut self, address: I2cAddr, packet: &[u8]) -> Result<(), ApError> {
+    fn send_packet(&mut self, address: I2cAddr, packet: &[u8]) -> Result<(), DecoderError> {
         let mut send_packet = [0; MAX_I2C_MESSAGE_LEN];
         send_packet[0] = packet.len().try_into().expect("i2c send message to big");
         send_packet[1..(packet.len() + 1)].copy_from_slice(packet);
@@ -94,7 +94,7 @@ impl DecoderDriver {
         Ok(())
     }
 
-    fn recieve_packet(&mut self, address: I2cAddr) -> Result<&[u8], ApError> {
+    fn recieve_packet(&mut self, address: I2cAddr) -> Result<&[u8], DecoderError> {
         let mut recv_len = 0;
 
         sleep(Duration::from_millis(3));
@@ -113,14 +113,14 @@ impl DecoderDriver {
         }
     }
 
-    pub fn send_struct<M: Serialize>(&mut self, address: I2cAddr, message: M) -> Result<(), ApError> {
+    pub fn send_struct<M: Serialize>(&mut self, address: I2cAddr, message: M) -> Result<(), DecoderError> {
         let mut send_buf = [0; MAX_I2C_MESSAGE_LEN];
         let serialized_message = postcard::to_slice::<Result<M, ProtocolError>>(&Ok(message), &mut send_buf)?;
 
         self.send_packet(address, serialized_message)
     }
 
-    pub fn receive_struct<'de, R: Deserialize<'de>>(&'de mut self, address: I2cAddr) -> Result<R, ApError> {
+    pub fn receive_struct<'de, R: Deserialize<'de>>(&'de mut self, address: I2cAddr) -> Result<R, DecoderError> {
         let response_bytes = self.recieve_packet(address)?;
 
         let response: Result<R, ProtocolError> = postcard::from_bytes(response_bytes)?;
@@ -130,12 +130,12 @@ impl DecoderDriver {
     pub fn send_and_receive_struct<'de, M: Serialize, R: Deserialize<'de>>(
         &'de mut self,
         address: I2cAddr, message: M
-    ) -> Result<R, ApError> {
+    ) -> Result<R, DecoderError> {
         self.send_struct(address, message)?;
         self.receive_struct(address)
     }
 
-    pub fn send_error(&mut self, address: I2cAddr) -> Result<(), ApError> {
+    pub fn send_error(&mut self, address: I2cAddr) -> Result<(), DecoderError> {
         let mut send_buf = [0; MAX_I2C_MESSAGE_LEN];
         let serialized_message = postcard::to_slice::<Result<(), ProtocolError>>(&Err(ProtocolError), &mut send_buf)?;
 

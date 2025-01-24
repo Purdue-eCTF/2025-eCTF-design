@@ -220,10 +220,13 @@ impl Message {
         }
     }
     pub fn debug(text: &str) -> Self {
-        let trunc_len = min(text.len(), MAX_BODY_SIZE);
-        let text_trunc = &text[..trunc_len];
+        // need to use length of bytes because utf8 could mess up length
+        let text_bytes = text.as_bytes();
+
+        let trunc_len = min(text_bytes.len(), MAX_BODY_SIZE);
+        let text_trunc = &text_bytes[..trunc_len];
         let mut body = [0; MAX_BODY_SIZE];
-        body[..text_trunc.len()].copy_from_slice(text_trunc.as_bytes());
+        body[..text_trunc.len()].copy_from_slice(text_trunc);
         Self {
             opcode: Opcode::Debug,
             length: text_trunc.len() as u16,

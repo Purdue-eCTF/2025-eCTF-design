@@ -2,11 +2,16 @@ use core::cmp::min;
 use max78000_hal::uart::uart;
 use thiserror_no_std::Error;
 
-// TODO: add error types
 #[derive(Debug, Error)]
 pub enum MessageError {
     #[error("Unknown error")]
     Unknown,
+    #[error("Unexpected opcode: {0:x}")]
+    UnexpectedOpcode(u8),
+    #[error("Incorrect magic: {0:x}")]
+    IncorrectMagic(u8),
+    #[error("Nonzero header length on ACK packet")]
+    AckError,
 }
 
 /*
@@ -94,15 +99,19 @@ impl Message {
 
     // TODO: better error handling
     #[inline]
-    pub fn read_header() -> Result<Self, ()> {
+    pub fn read_header() -> Result<Self, MessageError> {
         let reader = uart();
+
         let magic = reader.read_byte();
         if magic != MAGIC {
-            return Err(());
+            return Err(MessageError::IncorrectMagic(magic));
         }
-        let Ok(opcode) = Opcode::try_from(reader.read_byte()) else {
-            return Err(());
+
+        let opcode_byte = reader.read_byte();
+        let Ok(opcode) = Opcode::try_from(opcode_byte) else {
+            return Err(MessageError::UnexpectedOpcode(opcode_byte));
         };
+
         let mut length = [0, 0];
         for b in length.iter_mut() {
             // reader.read_bytes() special-cases newlines, which we don't want
@@ -116,7 +125,7 @@ impl Message {
         })
     }
 
-    pub fn read() -> Result<Self, ()> {
+    pub fn read() -> Result<Self, MessageError> {
         let reader = uart();
         let mut message = Self::read_header()?;
 
@@ -139,11 +148,11 @@ impl Message {
         ack.write_header();
     }
 
-    pub fn read_ack() -> Result<(), ()> {
+    pub fn read_ack() -> Result<(), MessageError> {
         let message = Self::read_header()?;
 
         if message.length != 0 {
-            Err(())
+            Err(MessageError::AckError)
         } else {
             Ok(())
         }
@@ -159,7 +168,7 @@ impl Message {
         }
     }
 
-    pub fn write(&self) -> Result<(), ()> {
+    pub fn write(&self) -> Result<(), MessageError> {
         self.write_header();
         if !NACKS.contains(&self.opcode) {
             Self::read_ack()?;

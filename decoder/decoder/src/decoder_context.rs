@@ -1,5 +1,6 @@
 use bytemuck::{must_cast_slice, Pod, Zeroable};
 use core::{marker::PhantomData, slice};
+use thiserror_no_std::Error;
 
 use max78000_hal::flash::FLASH_PAGE_SIZE;
 use max78000_hal::{flash::PAGE_MASK, Flash, Peripherals};
@@ -128,6 +129,12 @@ pub struct KeySubtree {
     key: [u8; 32],
 }
 
+#[derive(Debug, Error)]
+pub enum DecoderContextError {
+    #[error("Too many subscriptions!")]
+    TooManySubscriptions,
+}
+
 /// Information about channel sent back to tv for list channels
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Default, Pod, Zeroable)]
@@ -175,15 +182,19 @@ impl DecoderContext {
         }
     }
 
+    #[allow(unused)]
     pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<SubscriptionEntry> {
         self.subscriptions
             .iter()
             .filter_map(|flash_entry| flash_entry.get())
-            .filter(|subscription| subscription.channel_id == channel_id)
-            .next()
+            .find(|subscription| subscription.channel_id == channel_id)
     }
 
-    pub fn update_subscription(&mut self, subscription: &SubscriptionEntry) {
+    #[allow(unused)]
+    pub fn update_subscription(
+        &mut self,
+        subscription: &SubscriptionEntry,
+    ) -> Result<(), DecoderContextError> {
         // update subscription if it already exists
         for flash_entry in self.subscriptions.iter_mut() {
             let Some(subscription_old) = flash_entry.get() else {
@@ -192,7 +203,7 @@ impl DecoderContext {
 
             if subscription_old.channel_id == subscription.channel_id {
                 flash_entry.set(subscription);
-                return;
+                return Ok(());
             }
         }
 
@@ -200,12 +211,11 @@ impl DecoderContext {
         for flash_entry in self.subscriptions.iter_mut() {
             if !flash_entry.has_object() {
                 flash_entry.set(subscription);
-                return;
+                return Ok(());
             }
         }
 
-        // TODO: return error instead
-        panic!("too many subscriptions");
+        Err(DecoderContextError::TooManySubscriptions)
     }
 
     /// Returns a list of info about all subscribed channels.
@@ -227,6 +237,7 @@ impl DecoderContext {
         out
     }
 
+    #[allow(unused)]
     /// Gets rng for random operations.
     pub fn get_chacha(&mut self) -> &mut ChaCha20Rng {
         &mut self.chacha

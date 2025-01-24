@@ -13,6 +13,7 @@ pub fn force_rerun() {
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(".cargo_build_rs_rerun")
         .expect("could not create rerun file");
 
@@ -30,11 +31,12 @@ fn gen_addr(start: u32, end: u32, rng: &mut ThreadRng) -> u32 {
 
 /// Parse a string into 4 byte unsigned decoder id
 fn parse_decoder_id(n: &str) -> u32 {
-    if n.starts_with("0x") {
-        u32::from_str_radix(&n[2..], 16).expect("could not parse component id")
+    let n_parsed = if let Some(n) = n.strip_prefix("0x") {
+        u32::from_str_radix(n, 16)
     } else {
-        n.parse::<u32>().expect("could not parse component id")
-    }
+        n.parse::<u32>()
+    };
+    n_parsed.expect("could not parse component id")
 }
 
 fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH] {

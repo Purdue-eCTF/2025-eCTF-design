@@ -52,16 +52,6 @@ pub enum DecoderError {
     InvalidBootConditions,
 }
 
-#[allow(unused)]
-fn flash_red(n: usize) {
-    for _ in 0..n {
-        led_on(Led::Red);
-        sleep(Duration::from_millis(250));
-        led_off(Led::Red);
-        sleep(Duration::from_millis(250));
-    }
-}
-
 fn list_channels(context: &mut DecoderContext) {
     let channel_info = context.list_channels();
     let channel_info_bytes = must_cast_slice(channel_info.as_slice());
@@ -95,11 +85,7 @@ fn main() -> ! {
                 Opcode::List => list_channels(&mut context),
                 _ => (),
             }
-            // let out_dbg = Message::debug("does it work??");
-            // out_dbg.write().unwrap();
-            // let list_msg = Message::new(Opcode::List, 4, [0; MAX_BODY_SIZE]);
-            // list_msg.write().unwrap();
-            // loop {}
+            // utils::write_debug_message("does it work??");
         }
     }
 }
@@ -112,10 +98,10 @@ fn panic(info: &PanicInfo) -> ! {
     let writer = uart();
     let mut panic_msg = [0u8; 2048];
     let mut wrapper = SliceWriteWrapper::new(panic_msg.as_mut_slice());
-    if let Ok(_) = write!(wrapper, "{}", info) {
+    if write!(wrapper, "{}", info).is_ok() {
         let num_bytes = wrapper.offset;
         writer.write_byte(message::MAGIC);
-        writer.write_byte('E' as u8);
+        writer.write_byte(b'E');
         for b in (num_bytes as u16).to_le_bytes() {
             writer.write_byte(b);
         }

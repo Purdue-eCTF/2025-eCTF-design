@@ -1,4 +1,3 @@
-use core::cmp::min;
 use max78000_hal::uart::uart;
 use thiserror_no_std::Error;
 
@@ -10,7 +9,7 @@ pub enum MessageError {
     UnexpectedOpcode(u8),
     #[error("Incorrect magic: {0:x}")]
     IncorrectMagic(u8),
-    #[error("Nonzero header length on ACK packet")]
+    #[error("Nonzero body length on ACK packet")]
     AckError,
 }
 
@@ -50,15 +49,15 @@ impl TryFrom<u8> for Opcode {
     }
 }
 
-impl Into<u8> for Opcode {
-    fn into(self) -> u8 {
-        match self {
-            Self::Decode => 0x44,
-            Self::Subscribe => 0x53,
-            Self::List => 0x4c,
-            Self::Ack => 0x41,
-            Self::Debug => 0x47,
-            Self::Error => 0x45,
+impl From<Opcode> for u8 {
+    fn from(opcode: Opcode) -> u8 {
+        match opcode {
+            Opcode::Decode => 0x44,
+            Opcode::Subscribe => 0x53,
+            Opcode::List => 0x4c,
+            Opcode::Ack => 0x41,
+            Opcode::Debug => 0x47,
+            Opcode::Error => 0x45,
         }
     }
 }
@@ -77,7 +76,7 @@ impl Opcode {
     }
 }
 
-pub const MAGIC: u8 = '%' as u8;
+pub const MAGIC: u8 = b'%';
 pub const MAX_BODY_SIZE: usize = 1024;
 const CHUNK_SIZE: usize = 256;
 const NACKS: [Opcode; 2] = [Opcode::Debug, Opcode::Ack];
@@ -177,7 +176,7 @@ impl Message {
 
         if self.length != 0 {
             for chunk in self.body[..self.length.into()].chunks(CHUNK_SIZE) {
-                for b in chunk.into_iter().copied() {
+                for b in chunk.iter().copied() {
                     writer.write_byte(b);
                 }
                 if !NACKS.contains(&self.opcode) {
@@ -193,21 +192,6 @@ impl Message {
             opcode: Opcode::Ack,
             length: 0,
             body: [0; MAX_BODY_SIZE],
-        }
-    }
-
-    pub fn debug(text: &str) -> Self {
-        // need to use length of bytes because utf8 could mess up length
-        let text_bytes = text.as_bytes();
-
-        let trunc_len = min(text_bytes.len(), MAX_BODY_SIZE);
-        let text_trunc = &text_bytes[..trunc_len];
-        let mut body = [0; MAX_BODY_SIZE];
-        body[..text_trunc.len()].copy_from_slice(text_trunc);
-        Self {
-            opcode: Opcode::Debug,
-            length: text_trunc.len() as u16,
-            body,
         }
     }
 }

@@ -20,4 +20,6 @@ jobs:
           TOKEN: ${{ secrets.TOKEN }}
           IP: ${{ secrets.IP }}
           PORT: ${{ secrets.PORT }}
-        run: python upload.py '${{ github.sha }}' '${{ github.actor }}' '${{ github.event.head_commit.message }}' '${{ github.run_id }}'
+          ACTOR: ${{ github.actor }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: python upload.py '${{ github.sha }}' "$ACTOR' "$COMMIT_MESSAGE" '${{ github.run_id }}'

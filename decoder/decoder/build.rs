@@ -177,18 +177,3 @@ fn main() {
     println!("cargo:rustc-link-arg=-Tlink.x");
     println!("cargo:rerun-if-changed=link.x");
 }
-
-// struct HashResult {
-//     salt: [u8; 16],
-//     hash: [u8; 24],
-// }
-
-// fn hash(data: &str, cost: u32) -> Result<HashResult, Infallible> {
-//     let salt = generate_random_bytes();
-//     let hash = bcrypt(cost, salt, data.as_bytes());
-
-//     Ok(HashResult {
-//         salt,
-//         hash,
-//     })
-// }

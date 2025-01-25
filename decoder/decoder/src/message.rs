@@ -96,10 +96,6 @@ impl Message {
         }
     }
 
-    pub fn data(&self) -> &[u8] {
-        &self.body[..self.length.into()]
-    }
-
     pub fn data_mut(&mut self) -> &mut [u8] {
         &mut self.body[..self.length.into()]
     }

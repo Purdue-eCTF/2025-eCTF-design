@@ -19,6 +19,7 @@ use thiserror_no_std::Error;
 use utils::SliceWriteWrapper;
 
 mod crypto;
+mod decode;
 mod decoder_context;
 mod ectf_params;
 mod message;
@@ -73,13 +74,9 @@ fn list_channels(context: &mut DecoderContext) {
 
 #[entry]
 fn main() -> ! {
-    // safety: no critical sections depending on interrupts are currently held
-    unsafe {
-        cortex_m::interrupt::enable();
-    }
-
     let mut context = DecoderContext::new();
-    sleep(Duration::from_millis(100));
+    // there is a 1 second power up limit
+    sleep(Duration::from_millis(900));
     led_on(Led::Green);
 
     loop {
@@ -87,6 +84,7 @@ fn main() -> ! {
             let result = match message.opcode {
                 Opcode::List => Ok(list_channels(&mut context)),
                 Opcode::Subscribe => subscribe::subscribe(&mut context, message.data_mut()),
+                Opcode::Debug => decode::decode(&mut context, message.data_mut()),
                 _ => Ok(()),
             };
 

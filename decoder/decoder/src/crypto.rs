@@ -21,11 +21,11 @@ struct DecoderPayloadHeader {
 /// # Payload Format
 /// 
 /// |-----------------------------------------------|
+/// | Ed25519 Signature: 64 bytes                   |
+/// |-----------------------------------------------|
 /// | XChaCha20Poly1305 Nonce: 24 bytes             |
 /// |-----------------------------------------------|
 /// | Poly1305 Tag: 16 bytes                        |
-/// |-----------------------------------------------|
-/// | Ed25519 Signature: 64 bytes                   |
 /// |-----------------------------------------------|
 /// | Ciphertext: variable amount bytes             |
 /// |-----------------------------------------------|
@@ -37,7 +37,9 @@ pub fn decrypt_decoder_payload<'a>(
     symmetric_key: &[u8; 32],
     public_key: &VerifyingKey,
 ) -> Result<&'a [u8], DecoderError> {
-    assert!(payload.len() >= size_of::<DecoderPayloadHeader>() + associated_data_size);
+    if payload.len() < size_of::<DecoderPayloadHeader>() + associated_data_size {
+        return Err(DecoderError::InvalidEncoderPayload);
+    }
 
     let header: DecoderPayloadHeader = *from_bytes(&payload[..size_of::<DecoderPayloadHeader>()]);
 
@@ -65,4 +67,14 @@ pub fn decrypt_decoder_payload<'a>(
     };
 
     Ok(ciphertext)
+}
+
+/// Gets a reference to the associated data of the given decoder payload.
+pub fn get_decoder_payload_associated_data<T: Pod>(payload: &[u8]) -> Result<&T, DecoderError> {
+    if payload.len() < size_of::<DecoderPayloadHeader>() + size_of::<T>() {
+        return Err(DecoderError::InvalidEncoderPayload);
+    } else {
+        let associated_data = &payload[payload.len() - size_of::<T>()..];
+        Ok(from_bytes(associated_data))
+    }
 }

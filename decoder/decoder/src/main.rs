@@ -8,8 +8,6 @@ use core::str::Utf8Error;
 use core::time::Duration;
 use cortex_m_rt::entry;
 use decoder_context::DecoderContext;
-use design_utils::messages::ProtocolError;
-use design_utils::DesignUtilsError;
 use max78000_hal::led::{led_off, led_on, Led};
 use max78000_hal::timer::sleep;
 use max78000_hal::uart::uart;
@@ -40,16 +38,8 @@ pub enum DecoderError {
     InvalidCommand,
     #[error("Message with invalid utf8 received: {0}")]
     InvalidUtf8(#[from] Utf8Error),
-    #[error("Error in design utils: {0}")]
-    DesignUtilsError(#[from] DesignUtilsError),
-    #[error("Invalid challenge response for component {0}")]
-    InvalidChallengeResponse(usize),
-    #[error("Component reported en error occurred")]
-    ProtocolError(#[from] ProtocolError),
     #[error("Error: Suspicious activity detected")]
     SuspiciousActivity,
-    #[error("Error: invalid build id")]
-    InvalidBuildId,
     #[error("Error: conditions for boot are not met")]
     InvalidBootConditions,
     #[error("Error: invalid payload recieved")]

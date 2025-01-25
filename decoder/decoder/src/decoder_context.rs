@@ -61,9 +61,7 @@ impl<T: Pod> FlashEntry<T> {
     pub fn get(&self) -> Option<&T> {
         if self.has_object() {
             // trait bound AnyBitPattern ensures flash data valid for any bits
-            unsafe {
-                (self.address as *const T).as_ref()
-            }
+            unsafe { (self.address as *const T).as_ref() }
         } else {
             None
         }

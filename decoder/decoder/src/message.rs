@@ -96,6 +96,14 @@ impl Message {
         }
     }
 
+    pub fn data(&self) -> &[u8] {
+        &self.body[..self.length.into()]
+    }
+
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        &mut self.body[..self.length.into()]
+    }
+
     // TODO: better error handling
     #[inline]
     pub fn read_header() -> Result<Self, MessageError> {

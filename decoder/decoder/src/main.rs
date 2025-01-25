@@ -17,9 +17,12 @@ use max78000_hal::HalError;
 use message::{Message, Opcode};
 use thiserror_no_std::Error;
 use utils::SliceWriteWrapper;
+
+mod crypto;
 mod decoder_context;
 mod ectf_params;
 mod message;
+mod subscribe;
 mod utils;
 
 #[derive(Debug, Error)]
@@ -40,8 +43,6 @@ pub enum DecoderError {
     DesignUtilsError(#[from] DesignUtilsError),
     #[error("Invalid challenge response for component {0}")]
     InvalidChallengeResponse(usize),
-    #[error("Error while serializing or deserializing message: {0}")]
-    PostcardError(#[from] postcard::Error),
     #[error("Component reported en error occurred")]
     ProtocolError(#[from] ProtocolError),
     #[error("Error: Suspicious activity detected")]
@@ -50,6 +51,8 @@ pub enum DecoderError {
     InvalidBuildId,
     #[error("Error: conditions for boot are not met")]
     InvalidBootConditions,
+    #[error("Error: invalid payload recieved")]
+    InvalidEncoderPayload,
 }
 
 fn list_channels(context: &mut DecoderContext) {
@@ -80,12 +83,16 @@ fn main() -> ! {
     led_on(Led::Green);
 
     loop {
-        if let Ok(message) = Message::read() {
-            match message.opcode {
-                Opcode::List => list_channels(&mut context),
-                _ => (),
+        if let Ok(mut message) = Message::read() {
+            let result = match message.opcode {
+                Opcode::List => Ok(list_channels(&mut context)),
+                Opcode::Subscribe => subscribe::subscribe(&mut context, message.data_mut()),
+                _ => Ok(()),
+            };
+
+            if let Err(_error) = result {
+                todo!("report error");
             }
-            // utils::write_debug_message("does it work??");
         }
     }
 }

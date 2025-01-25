@@ -17,10 +17,7 @@ pub struct SliceWriteWrapper<'a> {
 
 impl<'a> SliceWriteWrapper<'a> {
     pub fn new(buf: &'a mut [u8]) -> Self {
-        SliceWriteWrapper {
-            buf,
-            offset: 0,
-        }
+        SliceWriteWrapper { buf, offset: 0 }
     }
 }
 

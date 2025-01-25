@@ -10,11 +10,11 @@ max78000_hal = { path = "../max78000_hal" }
 design_utils = { path = "../design_utils" }
 bytemuck = { version = "1.14.1", features = ["must_cast", "derive"] }
 thiserror-no-std = "2.0.2"
-postcard = "1.0.8"
 rand_core = { version = "0.6.4", default-features = false }
 rand_chacha = { version = "0.3.1", default-features = false }
 tinyvec = "1.6.0"
-serde = { version = "1.0", default-features = false }
+ed25519-dalek = { version = "2.1.1", default-features = false }
+chacha20poly1305 = { version = "0.10.1", default-features = false }
 
 [build-dependencies]
 serde = { version = "1.0.217", features = ["serde_derive"] }

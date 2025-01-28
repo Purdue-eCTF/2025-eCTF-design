@@ -114,6 +114,7 @@ def generate_subscription_nodes(root_key: bytes, min_time: int, max_time: int) -
 
     verify_timestamp(min_time)
     verify_timestamp(max_time)
+    assert min_time <= max_time
 
     root_node = KeyNode(key = root_key)
 

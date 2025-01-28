@@ -1,7 +1,5 @@
-from Crypto.Cipher import ChaCha20_Poly1305
-from Crypto.Random import get_random_bytes
 from .util import verify_timestamp, compute_chacha_block
-from secrets import SOMETHING_HERE #yeah idk what this should be
+from typing import List
 
 #TODO check chacha because idk what I'm doing --will :)
 class KeyNode:
@@ -53,16 +51,18 @@ def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
             return nodes_arr
         print(f"breaking at {k} with {node.time} and {max_time[:-1]}\n" + 
               f"                              {min_time[:-1]}")
+        # jack: I think this will generate 2 nodes in some cases when 1 node is fine,
+        # but that is fine and other than that lgtm
         nodes_arr += gen_minNode(node.gen_left_node(k), min_time[:-1], k + 1, [])
         nodes_arr += gen_maxNode(node.gen_right_node(k), max_time[:-1], k + 1, [])
         return nodes_arr
     
     if min_time and min_time[-1] == '0':
         node.gen_left_node(k)
-        generate_tree(node.left, min_time[:-1], max_time[:-1], k+1, nodes_arr)
+        return generate_tree(node.left, min_time[:-1], max_time[:-1], k+1, nodes_arr)
     elif max_time and max_time[-1] == '1':
         node.gen_right_node(k)
-        generate_tree(node.right, min_time[:-1], max_time[:-1], k+1, nodes_arr)
+        return generate_tree(node.right, min_time[:-1], max_time[:-1], k+1, nodes_arr)
         
 def gen_minNode(node: KeyNode, min_time, k, nodes_arr):
     k += 1
@@ -78,9 +78,9 @@ def gen_minNode(node: KeyNode, min_time, k, nodes_arr):
     if min_time.pop() == '0':
         temp = node.gen_right_node(k)
         nodes_arr.append(temp)
-        gen_minNode(node.gen_left_node(k), min_time, k)
+        return gen_minNode(node.gen_left_node(k), min_time, k, nodes_arr)
     else:
-        gen_minNode(node.gen_right_node(k), min_time, k)
+        return gen_minNode(node.gen_right_node(k), min_time, k, nodes_arr)
     
 def gen_maxNode(node: KeyNode, max_time, k, nodes_arr):
     k += 1
@@ -96,15 +96,21 @@ def gen_maxNode(node: KeyNode, max_time, k, nodes_arr):
     if max_time.pop() == '1':
         temp = node.gen_left_node(k)
         nodes_arr.append(temp)
-        gen_maxNode(node.gen_right_node(k), max_time, k)
+        return gen_maxNode(node.gen_right_node(k), max_time, k, nodes_arr)
     else: 
-        gen_maxNode(node.gen_left_node(k), max_time, k)
+        return gen_maxNode(node.gen_left_node(k), max_time, k, nodes_arr)
 
 def format_time(timestamp: int) -> str:
-    # code required timestamps as string of 0 and 1s, but backwards
-    return bin(timestamp)[2:].rjust(64, '0')[::-1]
+    # code required timestamps as list of 0 and 1s, but backwards
+    return list(bin(timestamp)[2:].rjust(64, '0')[::-1])
 
-def generate_subscription_nodes(root_key: bytes, min_time: int, max_time: int):
+def generate_subscription_nodes(root_key: bytes, min_time: int, max_time: int) -> List[KeyNode]:
+    """
+    Generates a list of keynodes with subtrees spanning the time region.
+
+    The number generated is logarithmic in size of region.
+    """
+
     verify_timestamp(min_time)
     verify_timestamp(max_time)
 

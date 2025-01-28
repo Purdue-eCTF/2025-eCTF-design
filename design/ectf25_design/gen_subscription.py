@@ -17,6 +17,9 @@ import struct
 
 from loguru import logger
 
+from .util import GlobalSecrets
+from .key_gen import generate_subscription_nodes
+
 
 def gen_subscription(
     secrets: bytes, device_id: int, start: int, end: int, channel: int
@@ -31,11 +34,11 @@ def gen_subscription(
     :param end: Last timestamp the subscription is valid for
     :param channel: Channel to enable
     """
-    # TODO: Update this function to provide a Decoder with whatever data it needs to
-    #   subscribe to a new channel
 
-    # Load the json of the secrets file
-    secrets = json.loads(secrets)
+    secrets = GlobalSecrets.from_json(secrets.decode("ascii"))
+    channel_keys = secrets.channels[channel]
+
+    key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
 
     # You can use secrets generated using `gen_secrets` here like:
     # secrets["some_secrets"]

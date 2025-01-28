@@ -89,10 +89,10 @@ class GlobalSecrets:
         return cls(
             subscribe_root_key = bytes(data["subscribe_root_key"]),
             subscribe_private_key = bytes(data["subscribe_private_key"]),
-            channels = {id: ChannelKey(
+            channels = {int(id): ChannelKey(
                 root_key = bytes(channel_json["root_key"]),
-                private_Key = bytes(channel_json["private_key"]),
-            ) for id, channel_json in data["channels"]}
+                private_key = bytes(channel_json["private_key"]),
+            ) for id, channel_json in data["channels"].items()}
         )
 
 def encrypt_payload(
@@ -146,7 +146,7 @@ def compute_chacha_block(input: bytes) -> bytes:
 
     assert len(input) == 32
 
-    cipher = ChaCha20.new(input, b'\0' * 8)
+    cipher = ChaCha20.new(key = input, nonce = b'\0' * 8)
 
     # just encrypt 0s to get the keystream
     return cipher.encrypt(b'\0' * 64)

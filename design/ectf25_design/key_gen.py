@@ -45,16 +45,17 @@ def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
         return
 
     if (min_time and min_time[-1] == '0') and (max_time and max_time[-1] == '1'):
-        if k == 63:
-            nodes_arr.append(node)
+        # I believe this adjustment should fix it.
+        if '1' in min_time or '0' in max_time:
+            print(f"breaking at {k} with {node.time} and {max_time[:-1]}\n" + 
+                f"                              {min_time[:-1]}")
+            # jack: I think this will generate 2 nodes in some cases when 1 node is fine.
+            # will: I see what you're saying, I believe it will generate two nodes in the case that the times
+            # split and diverge at maximum velocity. I will adjust this.
+            nodes_arr += gen_minNode(node.gen_left_node(k), min_time[:-1], k + 1, [])
+            nodes_arr += gen_maxNode(node.gen_right_node(k), max_time[:-1], k + 1, [])
             return nodes_arr
-        print(f"breaking at {k} with {node.time} and {max_time[:-1]}\n" + 
-              f"                              {min_time[:-1]}")
-        # jack: I think this will generate 2 nodes in some cases when 1 node is fine.
-        # will: I see what you're saying, I believe it will generate two nodes in the case that the times
-        # split and diverge at maximum velocity. I will adjust this.
-        nodes_arr += gen_minNode(node.gen_left_node(k), min_time[:-1], k + 1, [])
-        nodes_arr += gen_maxNode(node.gen_right_node(k), max_time[:-1], k + 1, [])
+        nodes_arr.append(node)
         return nodes_arr
     
     if min_time and min_time[-1] == '0':

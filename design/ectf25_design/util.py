@@ -1,6 +1,6 @@
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import eddsa
-from Crypto.Cipher import ChaCha20_Poly1305
+from Crypto.Cipher import ChaCha20_Poly1305, ChaCha20
 from Crypto.Hash import SHA256
 from dataclasses import dataclass
 from typing import Self, Dict, List
@@ -15,6 +15,11 @@ def bytes_to_eddsa_key(key: bytes) -> eddsa.EdDSASigScheme:
     """Constructs an Ed25519 signing key for a private key of bytes."""
 
     return eddsa.new(eddsa.import_private_key(key), "rfc8032")
+
+def verify_timestamp(timestamp: int):
+    """Asserts the given integer is a valid timestamp."""
+
+    assert timestamp >= 0 and timestamp < (1 << 64)
 
 @dataclass
 class ChannelKey:
@@ -135,3 +140,13 @@ def encrypt_payload(
     signature = private_key.sign(hashed_payload)
 
     return signature + payload_to_sign
+
+def compute_chacha_block(input: bytes) -> bytes:
+    """Computes 1 length doubling chacha block."""
+
+    assert len(input) == 32
+
+    cipher = ChaCha20.new(input, b'\0' * 8)
+
+    # just encrypt 0s to get the keystream
+    return cipher.encrypt(b'\0' * 64)

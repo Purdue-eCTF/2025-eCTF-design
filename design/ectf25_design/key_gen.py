@@ -1,37 +1,48 @@
 from Crypto.Cipher import ChaCha20_Poly1305
 from Crypto.Random import get_random_bytes
-import code
+from .util import verify_timestamp, compute_chacha_block
 from secrets import SOMETHING_HERE #yeah idk what this should be
 
 #TODO check chacha because idk what I'm doing --will :)
 class KeyNode:
-    def __init__(self, chacha=None, left=None, right=None, time=None, depth=None):
+    def __init__(self, key=None, left=None, right=None, time=None, depth=None):
         self.left = left
         self.right = right
-        self.chacha = chacha
+        self.key = key
         self.time = time
         self.depth = depth
     
     def gen_left_node(self, depth):
-        leftcha = ChaCha20_Poly1305.new(self.chacha[:len(self.chacha)//2])
+        leftcha = compute_chacha_block(self.key)[:len(self.key)]
         if (self.time == None): 
             self.time = [0]
-            self.left = KeyNode(chacha = leftcha, time=self.time, depth=depth)
+            self.left = KeyNode(key = leftcha, time=self.time, depth=depth)
             return self.left
-        self.left = KeyNode(chacha = leftcha, time=self.time + [0], depth=depth)
+        self.left = KeyNode(key = leftcha, time=self.time + [0], depth=depth)
         return self.left
     
     def gen_right_node(self, depth):
-        rightcha = ChaCha20_Poly1305.new(self.chacha[len(self.chacha)//2:])
+        rightcha = compute_chacha_block(self.key)[:len(self.key)]
         if (self.time == None): 
             self.time = [1]
-            self.right = KeyNode(chacha = rightcha, time=self.time, depth=depth)
+            self.right = KeyNode(key = rightcha, time=self.time, depth=depth)
             return self.right
-        self.right = KeyNode(chacha = rightcha, time=self.time + [1], depth=depth)
+        self.right = KeyNode(key = rightcha, time=self.time + [1], depth=depth)
         return self.right
     
 #TODO: I think this algorithm works to generate the minimum number of nodes.
 def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
+    """
+    USAGE:
+    call:
+        array = generate_tree(head, min_time, max_time, k, nodes_arr)
+        head = a head node generated with our global secret
+        min_time the binary representation of the minimum time in a stack
+        max_time the binary representation of the maximum time in a stack
+        k = 0
+        nodes_arr = []
+    """
+
     if min_time == None and max_time == None:
         print("over")
         return
@@ -88,19 +99,15 @@ def gen_maxNode(node: KeyNode, max_time, k, nodes_arr):
         gen_maxNode(node.gen_right_node(k), max_time, k)
     else: 
         gen_maxNode(node.gen_left_node(k), max_time, k)
-    
-  
-head = KeyNode(chacha=ChaCha20_Poly1305(SOMETHING_HERE)) 
-head = KeyNode() 
 
-print(generate_tree(head, 2, 6, 0, []))
-"""
-USAGE:
-call:
-    array = generate_tree(head, min_time, max_time, k, nodes_arr)
-    head = a head node generated with our global secret
-    min_time the binary representation of the minimum time in a stack
-    max_time the binary representation of the maximum time in a stack
-    k = 0
-    nodes_arr = []
-"""
+def format_time(timestamp: int) -> str:
+    # code required timestamps as string of 0 and 1s, but backwards
+    return bin(timestamp)[2:].rjust(64, '0')[::-1]
+
+def generate_subscription_nodes(root_key: bytes, min_time: int, max_time: int):
+    verify_timestamp(min_time)
+    verify_timestamp(max_time)
+
+    root_node = KeyNode(key = root_key)
+
+    return generate_tree(root_node, format_time(min_time), format_time(max_time), 0, [])

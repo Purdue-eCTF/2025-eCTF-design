@@ -15,9 +15,7 @@ impl Trng {
             gcr.set_trng_clock_enabled(true);
         });
 
-        Trng {
-            regs,
-        }
+        Trng { regs }
     }
 
     /// Gets a random 32 bit number from the trng.

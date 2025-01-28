@@ -1,12 +1,14 @@
-use core::fmt::{self, Write};
 use core::cmp::min;
+use core::fmt::{self, Write};
 use core::str;
 
-use once_cell::sync::OnceCell;
-use max78000_device::UART;
-use crate::IBRO_FREQUENCY;
 use crate::gcr::Gcr;
-use crate::gpio::{ConfigureIoOptions, Gpio, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType};
+use crate::gpio::{
+    ConfigureIoOptions, Gpio, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType,
+};
+use crate::IBRO_FREQUENCY;
+use max78000_device::UART;
+use once_cell::sync::OnceCell;
 
 const MAX_CLOCK_DIVISOR: u32 = (1 << 20) - 1;
 
@@ -96,12 +98,12 @@ impl Uart {
 
         clock_divide = min(clock_divide, MAX_CLOCK_DIVISOR);
 
-        self.regs.clkdiv().write(|clkdiv| unsafe { clkdiv.bits(clock_divide) });
+        self.regs
+            .clkdiv()
+            .write(|clkdiv| unsafe { clkdiv.bits(clock_divide) });
 
         // enable boad clock and wait for it to be ready
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.bclken().set_bit()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.bclken().set_bit());
 
         while self.regs.ctrl().read().bclken().bit_is_clear() {}
     }
@@ -119,9 +121,7 @@ impl Uart {
 
         self.regs.fifo().write(|fifo| {
             // safety: writing 1 bytes to the data register is intended usage of uart
-            unsafe {
-                fifo.data().bits(byte)
-            }
+            unsafe { fifo.data().bits(byte) }
         });
     }
 
@@ -158,9 +158,7 @@ impl Uart {
     }
 
     pub fn flush_uart_receive(&self) {
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.rx_flush().set_bit()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.rx_flush().set_bit());
 
         while !self.is_receive_empty() {}
     }

@@ -1,10 +1,10 @@
-use core::sync::atomic::{AtomicU32, Ordering};
-use core::time::Duration;
 use core::cell::RefCell;
 use core::ops::Add;
+use core::sync::atomic::{AtomicU32, Ordering};
+use core::time::Duration;
 
 use cortex_m::interrupt::{self, Mutex};
-use cortex_m::peripheral::{SYST, syst::SystClkSource};
+use cortex_m::peripheral::{syst::SystClkSource, SYST};
 use cortex_m_rt::exception;
 
 use crate::{Gcr, HalError};
@@ -23,9 +23,7 @@ impl Instant {
         let (current_tick, wrap_count) = interrupt::free(|token| {
             let mut systick_ref = SYSTICK.borrow(token).borrow_mut();
 
-            let systick = systick_ref
-                .as_mut()
-                .expect("timer not initialized");
+            let systick = systick_ref.as_mut().expect("timer not initialized");
 
             // first read current tick
             let current_tick = SYST::get_current();
@@ -42,7 +40,8 @@ impl Instant {
         });
 
         // current tick subtracted from reaload val because it counts down
-        let total_ticks = (wrap_count as u64 * SYSTICK_RELOAD_VAL as u64) + (SYSTICK_RELOAD_VAL - current_tick) as u64;
+        let total_ticks = (wrap_count as u64 * SYSTICK_RELOAD_VAL as u64)
+            + (SYSTICK_RELOAD_VAL - current_tick) as u64;
 
         let sysclock_freq = Gcr::with(|gcr| gcr.get_sysclock_frequency()) as u64;
 
@@ -113,9 +112,7 @@ fn SysTick() {
     interrupt::free(|token| {
         let mut systick_ref = SYSTICK.borrow(token).borrow_mut();
 
-        let systick = systick_ref
-            .as_mut()
-            .expect("timer not initialized");
+        let systick = systick_ref.as_mut().expect("timer not initialized");
 
         if systick.has_wrapped() {
             WRAP_COUNT.fetch_add(1, Ordering::Relaxed);

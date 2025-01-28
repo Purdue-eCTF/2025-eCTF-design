@@ -23,7 +23,7 @@ pub enum CommittedArrayError {
 }
 
 /// Commited Array acts like an atomic array of bytes.
-/// 
+///
 /// Use `try_commit` to save an array in the commited array.
 /// Use `try_take` to retrieve the value from the commited array and reset its value.
 pub struct CommittedArray {
@@ -49,31 +49,26 @@ impl CommittedArray {
     }
 
     /// Returns a reference to the underlying commited array
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// No other mutable reference to the commited array,
     /// and no other reference immutable or not can exist when this is called.
     unsafe fn inner(&self) -> &mut CommittedArrayData {
-        unsafe {
-            self.inner.get().as_mut().unwrap()
-        }
+        unsafe { self.inner.get().as_mut().unwrap() }
     }
 
     /// Copies the data from the given slice into the commited array.
-    /// 
+    ///
     /// Returns an error if the commited array already has data stored in it.
     pub fn try_commit(&self, data: &[u8]) -> Result<(), CommittedArrayError> {
         if data.len() > COMMITTED_ARRAY_CAPACITY {
             return Err(CommittedArrayError::InputTooBig);
         }
 
-        self.status.compare_exchange(
-            EMPTY,
-            BUSY,
-            Ordering::Acquire,
-            Ordering::Relaxed
-        ).or(Err(CommittedArrayError::Busy))?;
+        self.status
+            .compare_exchange(EMPTY, BUSY, Ordering::Acquire, Ordering::Relaxed)
+            .or(Err(CommittedArrayError::Busy))?;
 
         // safety: the committed queue is currently in the busy state, no one else can access the inner data
         let inner = unsafe { self.inner() };
@@ -88,19 +83,16 @@ impl CommittedArray {
     }
 
     /// Retrieves data from the commited array and copies it into buf.
-    /// 
+    ///
     /// Returns an errror if the commited array does not have any data.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// A reference to the portion of buf which contains the data.
     pub fn try_take<'a>(&self, buf: &'a mut [u8]) -> Result<&'a [u8], CommittedArrayError> {
-        self.status.compare_exchange(
-            FULL,
-            BUSY,
-            Ordering::Acquire,
-            Ordering::Relaxed
-        ).or(Err(CommittedArrayError::Busy))?;
+        self.status
+            .compare_exchange(FULL, BUSY, Ordering::Acquire, Ordering::Relaxed)
+            .or(Err(CommittedArrayError::Busy))?;
 
         // safety: the committed queue is currently in the busy state, no one else can access the inner data
         let inner = unsafe { self.inner() };

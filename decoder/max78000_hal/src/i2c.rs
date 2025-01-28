@@ -6,10 +6,12 @@ use cortex_m::interrupt::{free as interrupt_free, Mutex};
 use cortex_m::peripheral::NVIC;
 use max78000_device::{interrupt, Interrupt, I2C1};
 
-use crate::gpio::{ConfigureIoOptions, Gpio, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType};
 use crate::committed_array::{CommittedArray, CommittedArrayError};
-use crate::HalError;
 use crate::gcr::Gcr;
+use crate::gpio::{
+    ConfigureIoOptions, Gpio, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType,
+};
+use crate::HalError;
 
 pub const MAX_I2C_MESSAGE_LEN: usize = 256;
 
@@ -36,9 +38,9 @@ struct I2cInner {
 
 impl I2cInner {
     fn clear_rx_fifo(&self) {
-        self.regs.rxctrl0().modify(|_, rxctrl0| {
-            rxctrl0.flush().set_bit()
-        });
+        self.regs
+            .rxctrl0()
+            .modify(|_, rxctrl0| rxctrl0.flush().set_bit());
 
         while self.regs.rxctrl0().read().flush().bit_is_set() {
             //core::hint::spin_loop();
@@ -46,9 +48,9 @@ impl I2cInner {
     }
 
     fn clear_tx_fifo(&self) {
-        self.regs.txctrl0().modify(|_, rxctrl0| {
-            rxctrl0.flush().set_bit()
-        });
+        self.regs
+            .txctrl0()
+            .modify(|_, rxctrl0| rxctrl0.flush().set_bit());
 
         while self.regs.txctrl0().read().flush().bit_is_set() {
             //core::hint::spin_loop();
@@ -58,29 +60,29 @@ impl I2cInner {
     fn set_rx_threshold(&self, n: u8) {
         assert!(n <= RX_FIFO_LEN);
 
-        self.regs.rxctrl0().modify(|_, rxctrl0| {
-            rxctrl0.thd_lvl().variant(n)
-        });
+        self.regs
+            .rxctrl0()
+            .modify(|_, rxctrl0| rxctrl0.thd_lvl().variant(n));
     }
 
     fn set_tx_threshold(&self, n: u8) {
         assert!(n <= TX_FIFO_LEN);
 
-        self.regs.txctrl0().modify(|_, txctrl0| {
-            txctrl0.thd_val().variant(n)
-        });
+        self.regs
+            .txctrl0()
+            .modify(|_, txctrl0| txctrl0.thd_val().variant(n));
     }
 
     fn set_rx_threshold_int_enabled(&self, enabled: bool) {
-        self.regs.inten0().modify(|_, inten0| {
-            inten0.rx_thd().bit(enabled)
-        });
+        self.regs
+            .inten0()
+            .modify(|_, inten0| inten0.rx_thd().bit(enabled));
     }
 
     fn set_tx_threshold_int_enabled(&self, enabled: bool) {
-        self.regs.inten0().modify(|_, inten0| {
-            inten0.tx_thd().bit(enabled)
-        });
+        self.regs
+            .inten0()
+            .modify(|_, inten0| inten0.tx_thd().bit(enabled));
     }
 
     fn is_rx_fifo_empty(&self) -> bool {
@@ -103,9 +105,9 @@ impl I2cInner {
     }
 
     /// Writes the data into the txfifo
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Returns the number of bytes written
     fn write_tx_fifo(&self, data: &[u8]) -> usize {
         for (i, byte) in data.iter().enumerate() {
@@ -159,13 +161,13 @@ impl I2cInner {
             panic!("invalid clock speed");
         }
 
-        self.regs.clkhi().write(|clkhi| {
-            clkhi.hi().variant(ticks_per_hi_low as u16)
-        });
+        self.regs
+            .clkhi()
+            .write(|clkhi| clkhi.hi().variant(ticks_per_hi_low as u16));
 
-        self.regs.clklo().write(|clklo| {
-            clklo.lo().variant(ticks_per_hi_low as u16)
-        });
+        self.regs
+            .clklo()
+            .write(|clklo| clklo.lo().variant(ticks_per_hi_low as u16));
     }
 }
 
@@ -173,9 +175,7 @@ pub struct UninitializedI2c(I2cInner);
 
 impl UninitializedI2c {
     pub(crate) fn new(regs: I2C1) -> Self {
-        UninitializedI2c(I2cInner {
-            regs,
-        })
+        UninitializedI2c(I2cInner { regs })
     }
 
     fn init_common(&self) {
@@ -203,16 +203,15 @@ impl UninitializedI2c {
         self.0.set_tx_threshold(2);
 
         // enable i2c controller
-        self.0.regs.ctrl().modify(|_, ctrl| {
-            ctrl.en().set_bit()
-        });
+        self.0.regs.ctrl().modify(|_, ctrl| ctrl.en().set_bit());
     }
 
     pub fn init_master(self, frequency_hz: u32) -> MasterI2c {
         self.init_common();
-        self.0.regs.ctrl().modify(|_, ctrl| {
-            ctrl.mst_mode().set_bit()
-        });
+        self.0
+            .regs
+            .ctrl()
+            .modify(|_, ctrl| ctrl.mst_mode().set_bit());
 
         self.0.set_frequency(frequency_hz);
 
@@ -235,9 +234,10 @@ impl UninitializedI2c {
             });
         }
 
-        self.0.regs.slave0().modify(|_, slave| {
-            unsafe { slave.bits(address.into()) }
-        });
+        self.0
+            .regs
+            .slave0()
+            .modify(|_, slave| unsafe { slave.bits(address.into()) });
 
         self.0.set_frequency(frequency_hz);
 
@@ -248,7 +248,10 @@ impl UninitializedI2c {
 
         interrupt_free(|token| {
             let mut handler_state = HANDLER_STATE.borrow(token).borrow_mut();
-            assert!(handler_state.is_none(), "i2c handler state already initialized");
+            assert!(
+                handler_state.is_none(),
+                "i2c handler state already initialized"
+            );
 
             *handler_state = Some(I2cHandlerState {
                 i2c: self.0,
@@ -272,15 +275,17 @@ pub struct MasterI2c(I2cInner);
 
 impl MasterI2c {
     fn start(&self) {
-        self.0.regs.mstctrl().modify(|_, mstctrl| {
-            mstctrl.start().set_bit()
-        });
+        self.0
+            .regs
+            .mstctrl()
+            .modify(|_, mstctrl| mstctrl.start().set_bit());
     }
 
     fn stop(&self) {
-        self.0.regs.mstctrl().modify(|_, mstctrl| {
-            mstctrl.stop().set_bit()
-        });
+        self.0
+            .regs
+            .mstctrl()
+            .modify(|_, mstctrl| mstctrl.stop().set_bit());
 
         while self.0.regs.mstctrl().read().stop().bit_is_set() {
             //core::hint::spin_loop();
@@ -296,7 +301,7 @@ impl MasterI2c {
     /// Writes bytes to the given i2c address
     ///
     /// # Returns
-    /// 
+    ///
     /// Returns the number of bytes written
     pub fn send(&mut self, address: I2cAddr, data: &[u8]) -> Result<usize, HalError> {
         assert!(data.len() <= MAX_I2C_MESSAGE_LEN);
@@ -345,12 +350,12 @@ impl MasterI2c {
     }
 
     /// Receives bytes from the given device with the given address.
-    /// 
+    ///
     /// Recieves exactly `buffer.len()` bytes.
     pub fn recv(&mut self, address: I2cAddr, buffer: &mut [u8]) -> Result<(), HalError> {
         assert!(buffer.len() <= MAX_I2C_MESSAGE_LEN);
         if buffer.len() == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         // flags have to be cleared first, because if tx lockout flag is set,
@@ -371,7 +376,7 @@ impl MasterI2c {
 
             rxctrl1.cnt().variant(write_len)
         });
-        
+
         // write slave address with read bit set
         self.0.write_tx_fifo(&[(address << 1) | 1]);
 
@@ -429,7 +434,7 @@ impl ClientI2c {
                     // get around limitation of borrow checker
                     let len = data.len();
                     return Ok(&buf[..len]);
-                },
+                }
                 Err(CommittedArrayError::Busy) => (),
                 Err(e) => return Err(e.into()),
             }
@@ -446,7 +451,7 @@ pub enum I2cTransactionMode {
     /// The component is currently receiving a command
     Receiving,
     /// The component is waiting for a command to finish processing
-    /// 
+    ///
     /// Ap should repeatedly pull the length until it is non-zero
     WaitSend,
     /// The component is ready to send a response
@@ -482,7 +487,9 @@ impl I2cHandlerState {
         }
 
         if self.i2c_mode == I2cTransactionMode::Receiving {
-            let read_len = self.i2c.read_rx_fifo(&mut self.data[self.data_index..self.data_len]);
+            let read_len = self
+                .i2c
+                .read_rx_fifo(&mut self.data[self.data_index..self.data_len]);
             self.data_index += read_len;
 
             if self.data_index == self.data_len {
@@ -499,7 +506,9 @@ impl I2cHandlerState {
 
     fn write_bytes(&mut self) {
         if self.i2c_mode == I2cTransactionMode::Sending {
-            let write_len = self.i2c.write_tx_fifo(&self.data[self.data_index..self.data_len]);
+            let write_len = self
+                .i2c
+                .write_tx_fifo(&self.data[self.data_index..self.data_len]);
             self.data_index += write_len;
 
             if self.data_index == self.data_len {
@@ -527,18 +536,18 @@ impl I2cHandlerState {
                         self.i2c.write_tx_fifo(&[data_len.try_into().unwrap()]);
 
                         self.i2c_mode = I2cTransactionMode::ReadySend;
-                    },
+                    }
                     Err(_) => {
                         self.i2c.write_tx_fifo(&[0]);
                     }
                 }
-            },
+            }
             I2cTransactionMode::ReadySend => {
                 self.i2c_mode = I2cTransactionMode::Sending;
                 self.i2c.set_tx_threshold_int_enabled(true);
 
                 self.write_bytes();
-            },
+            }
             _ => (),
         }
     }
@@ -561,10 +570,10 @@ impl I2cHandlerState {
             self.i2c.clear_flags(RD_ADDR_MATCH, 0);
         }
 
-        if self.i2c.regs.intfl0().read().rx_thd().bit_is_set() && (
-            self.i2c_mode == I2cTransactionMode::Receiving
-            || self.i2c_mode == I2cTransactionMode::ReceivingLength
-        ) {
+        if self.i2c.regs.intfl0().read().rx_thd().bit_is_set()
+            && (self.i2c_mode == I2cTransactionMode::Receiving
+                || self.i2c_mode == I2cTransactionMode::ReceivingLength)
+        {
             self.read_bytes();
 
             self.i2c.clear_flags(RX_THD, 0);
@@ -578,7 +587,9 @@ impl I2cHandlerState {
             self.i2c.clear_flags(WR_ADDR_MATCH, 0);
         }
 
-        if self.i2c.regs.intfl0().read().tx_thd().bit_is_set() && self.i2c_mode == I2cTransactionMode::Sending {
+        if self.i2c.regs.intfl0().read().tx_thd().bit_is_set()
+            && self.i2c_mode == I2cTransactionMode::Sending
+        {
             self.i2c.clear_tx_lockout();
 
             self.write_bytes();

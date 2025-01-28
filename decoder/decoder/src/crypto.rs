@@ -1,6 +1,6 @@
-use ed25519_dalek::{VerifyingKey, Verifier, Signature, SIGNATURE_LENGTH};
-use chacha20poly1305::{AeadInPlace, XChaCha20Poly1305, KeyInit};
-use bytemuck::{Pod, Zeroable, from_bytes};
+use bytemuck::{from_bytes, Pod, Zeroable};
+use chacha20poly1305::{AeadInPlace, KeyInit, XChaCha20Poly1305};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey, SIGNATURE_LENGTH};
 
 use crate::DecoderError;
 
@@ -14,12 +14,12 @@ struct DecoderPayloadHeader {
 }
 
 /// Verifies and decrypts any payload the decoder recieves.
-/// 
+///
 /// This includes both satelite frames and subscription data.
 /// Decrypted data overwrites ciphertext in payload and a reference to this data is returned.
 ///
 /// # Payload Format
-/// 
+///
 /// |-----------------------------------------------|
 /// | Ed25519 Signature: 64 bytes                   |
 /// |-----------------------------------------------|
@@ -47,7 +47,8 @@ pub fn decrypt_decoder_payload<'a>(
     // signaute should include chacha nonce and tag, otherwise attacker can alter nonce and get invalid frame
     // decode for scenario 5 if they have the key
     let message_to_verify = &payload[SIGNATURE_LENGTH..];
-    let Ok(_) = public_key.verify(message_to_verify, &Signature::from_bytes(&header.signature)) else {
+    let Ok(_) = public_key.verify(message_to_verify, &Signature::from_bytes(&header.signature))
+    else {
         return Err(DecoderError::InvalidEncoderPayload);
     };
 

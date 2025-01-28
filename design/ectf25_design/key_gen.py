@@ -28,7 +28,6 @@ class KeyNode:
         self.right = KeyNode(key = rightcha, time=self.time + [1], depth=depth)
         return self.right
     
-#TODO: I think this algorithm works to generate the minimum number of nodes.
 def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
     """
     USAGE:
@@ -51,8 +50,9 @@ def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
             return nodes_arr
         print(f"breaking at {k} with {node.time} and {max_time[:-1]}\n" + 
               f"                              {min_time[:-1]}")
-        # jack: I think this will generate 2 nodes in some cases when 1 node is fine,
-        # but that is fine and other than that lgtm
+        # jack: I think this will generate 2 nodes in some cases when 1 node is fine.
+        # will: I see what you're saying, I believe it will generate two nodes in the case that the times
+        # split and diverge at maximum velocity. I will adjust this.
         nodes_arr += gen_minNode(node.gen_left_node(k), min_time[:-1], k + 1, [])
         nodes_arr += gen_maxNode(node.gen_right_node(k), max_time[:-1], k + 1, [])
         return nodes_arr

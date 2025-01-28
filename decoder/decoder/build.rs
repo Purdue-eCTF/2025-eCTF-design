@@ -1,4 +1,4 @@
-use argon2::{Argon2, Params};
+use argon2::{Argon2, Algorithm, Version, Params};
 use ed25519_dalek::{SecretKey, SigningKey, PUBLIC_KEY_LENGTH};
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -74,7 +74,11 @@ fn main() {
         parse_decoder_id(&std::env::var("DECODER_ID").expect("Decoder ID not specified"));
 
     // first generate subscription key, which is using argon2
-    let hasher = Argon2::default();
+    // these params are the one used by the python library we picked
+    // they are highed paramaters then the default ones of the rust `argon2` library
+    let params = Params::new(65536, 3, 4, None).unwrap();
+    let hasher = Argon2::new(Algorithm::Argon2id, Version::default(), params);
+
     let mut subscription_key = [0; Params::DEFAULT_OUTPUT_LEN];
     hasher
         .hash_password_into(

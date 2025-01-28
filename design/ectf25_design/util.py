@@ -2,9 +2,12 @@ from Crypto.Random import get_random_bytes
 from Crypto.Signature import eddsa
 from Crypto.Cipher import ChaCha20_Poly1305, ChaCha20
 from Crypto.Hash import SHA256
+from argon2 import PasswordHasher
 from dataclasses import dataclass
 from typing import Self, Dict, List
+import base64
 import json
+import struct
 
 def random(n: int) -> bytes:
     """Generates `n` cryptographically secure random bytes."""
@@ -19,7 +22,7 @@ def bytes_to_eddsa_key(key: bytes) -> eddsa.EdDSASigScheme:
 def verify_timestamp(timestamp: int):
     """Asserts the given integer is a valid timestamp."""
 
-    assert timestamp >= 0 and timestamp < (1 << 64)
+    assert timestamp >= 0 and timestamp < (2 ** 64)
 
 @dataclass
 class ChannelKey:
@@ -56,6 +59,29 @@ class GlobalSecrets:
 
     def subscribe_signing_key(self) -> eddsa.EdDSASigScheme:
         return bytes_to_eddsa_key(self.subscribe_private_key)
+    
+    def subscription_key_for_decoder(self, decoder_id: int) -> bytes:
+        # decoder id must be 4 byte unsigned integer
+        assert decoder_id >= 0 and decoder_id < (2 ** 32)
+        decoder_id = struct.pack("<I", decoder_id)
+
+        # use argon2id to derive the decoder subscription key
+        # these are the default values, just explicitly specified, and with different salt len
+        hasher = PasswordHasher(
+            time_cost = 3,
+            memory_cost = 65536,
+            parallelism = 4,
+            hash_len = 32,
+            salt_len = 32,
+        )
+        hash = hasher.hash(decoder_id, salt = self.subscribe_root_key)
+
+        print(hash)
+
+        # returned hash string has many paramaters encoded as well, delimeted by $
+        # last element is the hash itself
+        # have to add 1 = to base64 because python base64 padding is always mandatory apparently
+        return base64.b64decode(hash.split('$')[-1] + '=')
 
     @classmethod
     def generate(cls, channel_ids: List[int]) -> Self:

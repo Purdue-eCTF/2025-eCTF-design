@@ -38,6 +38,8 @@ def gen_subscription(
     secrets = GlobalSecrets.from_json(secrets.decode("ascii"))
     channel_keys = secrets.channels[channel]
 
+    print(list(secrets.subscription_key_for_decoder(device_id)))
+
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
 
     # You can use secrets generated using `gen_secrets` here like:

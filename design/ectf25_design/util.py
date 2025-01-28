@@ -7,9 +7,13 @@ from typing import Self, Dict, List
 import json
 
 def random(n: int) -> bytes:
+    """Generates `n` cryptographically secure random bytes."""
+
     return get_random_bytes(n)
 
 def bytes_to_eddsa_key(key: bytes) -> eddsa.EdDSASigScheme:
+    """Constructs an Ed25519 signing key for a private key of bytes."""
+
     return eddsa.new(eddsa.import_private_key(key), "rfc8032")
 
 @dataclass

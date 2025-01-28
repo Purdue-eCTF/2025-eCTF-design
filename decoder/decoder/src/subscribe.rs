@@ -17,8 +17,7 @@ pub fn subscribe(
     // TODO: parse subscription and update data in flash
 
     let response = Message::new(Opcode::Subscribe, 0, [0; 1024]);
-    // TODO: handle error
-    response.write().unwrap();
+    response.write()?;
 
     Ok(())
 }

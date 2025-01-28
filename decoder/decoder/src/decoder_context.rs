@@ -103,19 +103,25 @@ impl<T: Pod> FlashEntry<T> {
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct SubscriptionEntry {
     /// Start of subscription (inclusive)
-    start_time: u64,
+    pub start_time: u64,
     /// End of subscription (inclusive)
-    end_time: u64,
+    pub end_time: u64,
     /// Id of channel subscription is for
-    channel_id: u32,
+    pub channel_id: u32,
     /// Number of internal nodes in subtree for deriving frame keys
     // bigger than needed for padding
-    subtree_count: u32,
+    pub subtree_count: u32,
     /// Public key for channel
-    public_key: [u8; 32],
+    pub public_key: [u8; 32],
     /// Internal nodes used to reconstruct frame keys
     // 126 is I beleive worse case scenario for how many subtrees we need
-    subtrees: [KeySubtree; 128],
+    pub subtrees: [KeySubtree; 128],
+}
+
+impl SubscriptionEntry {
+    pub fn active_subtrees(&self) -> &[KeySubtree] {
+        &self.subtrees[..self.subtree_count as usize]
+    }
 }
 
 /// Represents information about one internal node in the key tree for a channel.
@@ -123,13 +129,13 @@ pub struct SubscriptionEntry {
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct KeySubtree {
     /// If timeatamp & mask == timestamp_value, timestamp is in this node
-    timestamp_value: u64,
-    mask: u64,
+    pub timestamp_value: u64,
+    pub mask: u64,
     /// Amount of bits to shift timestamp to the left after a match to start deriving key
     // bigger than needed for padding
-    shift: u64,
+    pub shift: u64,
     /// Value of internal node used to derive keys
-    key: [u8; 32],
+    pub key: [u8; 32],
 }
 
 #[derive(Debug, Error)]

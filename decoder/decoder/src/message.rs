@@ -96,6 +96,13 @@ impl Message {
         }
     }
 
+    pub fn from_data(opcode: Opcode, data: &[u8]) -> Self {
+        let mut body = [0; MAX_BODY_SIZE];
+        body[..data.len()].copy_from_slice(data);
+
+        Self::new(opcode, data.len() as u16, body)
+    }
+
     pub fn data_mut(&mut self) -> &mut [u8] {
         &mut self.body[..self.length.into()]
     }

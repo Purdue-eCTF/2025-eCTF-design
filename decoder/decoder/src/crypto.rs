@@ -1,6 +1,8 @@
 use bytemuck::{from_bytes, Pod, Zeroable};
 use chacha20poly1305::{AeadInPlace, KeyInit, XChaCha20Poly1305};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey, SIGNATURE_LENGTH};
+use rand_chacha::ChaCha20Rng;
+use rand_core::{SeedableRng, RngCore};
 
 use crate::DecoderError;
 
@@ -78,4 +80,14 @@ pub fn get_decoder_payload_associated_data<T: Pod>(payload: &[u8]) -> Result<&T,
         let associated_data = &payload[payload.len() - size_of::<T>()..];
         Ok(from_bytes(associated_data))
     }
+}
+
+/// Computes 1 block of ChaCha20 with `key` as the secret input.
+pub fn compute_chacha_block(key: [u8; 32]) -> [u8; 64] {
+    let mut chacha = ChaCha20Rng::from_seed(key);
+
+    let mut output = [0; 64];
+    chacha.fill_bytes(&mut output);
+
+    output
 }

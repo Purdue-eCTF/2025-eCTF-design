@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use bytemuck::PodCastError;
 use bytemuck::{checked::CheckedCastError, must_cast_slice};
 use core::fmt::Write;
 use core::panic::PanicInfo;
@@ -12,7 +13,7 @@ use max78000_hal::led::{led_off, led_on, Led};
 use max78000_hal::timer::sleep;
 use max78000_hal::uart::uart;
 use max78000_hal::HalError;
-use message::{Message, Opcode};
+use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
 use utils::SliceWriteWrapper;
 
@@ -30,6 +31,8 @@ pub enum DecoderError {
     HalError(#[from] HalError),
     #[error("Error interpreting bytes: {0}")]
     CastError(#[from] CheckedCastError),
+    #[error("Error casting bytes: {0}")]
+    PodCastError(#[from] PodCastError),
     #[error("An invalid component was detected")]
     InvalidComponentError,
     #[error("An invalid pin, secret key, or component id was entered")]
@@ -44,9 +47,13 @@ pub enum DecoderError {
     InvalidBootConditions,
     #[error("Error: invalid payload recieved")]
     InvalidEncoderPayload,
+    #[error("Error: subscription is not valid for decoding the given frame")]
+    InvalidSubscription,
+    #[error("Messaging error: {0}")]
+    MessagingError(#[from] MessageError),
 }
 
-fn list_channels(context: &mut DecoderContext) {
+fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {
     let channel_info = context.list_channels();
     let channel_info_bytes = must_cast_slice(channel_info.as_slice());
 
@@ -58,8 +65,9 @@ fn list_channels(context: &mut DecoderContext) {
     data[4..(4 + channel_info_bytes.len())].copy_from_slice(channel_info_bytes);
 
     let response = Message::new(Opcode::List, (channel_info_bytes.len() + 4) as u16, data);
-    // TODO: handle error
-    response.write().unwrap();
+    response.write()?;
+
+    Ok(())
 }
 
 #[entry]
@@ -72,7 +80,7 @@ fn main() -> ! {
     loop {
         if let Ok(mut message) = Message::read() {
             let result = match message.opcode {
-                Opcode::List => Ok(list_channels(&mut context)),
+                Opcode::List => list_channels(&mut context),
                 Opcode::Subscribe => subscribe::subscribe(&mut context, message.data_mut()),
                 Opcode::Debug => decode::decode(&mut context, message.data_mut()),
                 _ => Ok(()),

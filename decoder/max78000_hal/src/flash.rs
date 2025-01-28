@@ -22,7 +22,7 @@ pub const FLASH_SIZE: usize = 0x80000;
 static FLASH: OnceCell<Flash> = OnceCell::new();
 
 /// Used to interact with the max78000 flash memory.
-/// 
+///
 /// Performs various fuctionality such as writing to and clearing flash.
 #[derive(Debug)]
 pub struct Flash {
@@ -32,15 +32,12 @@ pub struct Flash {
 impl Flash {
     /// Initializes global instance of flash controller
     pub(crate) fn init(regs: FLC) {
-        FLASH.set(Self::new(regs))
-            .expect("could not setup flash");
+        FLASH.set(Self::new(regs)).expect("could not setup flash");
     }
 
     /// Creates a new Flash instance from the flash controller registers.
     pub(crate) fn new(regs: FLC) -> Self {
-        Flash {
-            regs,
-        }
+        Flash { regs }
     }
 
     pub fn get() -> &'static Self {
@@ -51,7 +48,11 @@ impl Flash {
     fn await_not_busy(&self) {
         let mut ctrl = self.regs.ctrl().read();
 
-        while ctrl.pend().bit_is_set() || ctrl.wr().bit_is_set() || ctrl.me().bit_is_set() || ctrl.pge().bit_is_set() {
+        while ctrl.pend().bit_is_set()
+            || ctrl.wr().bit_is_set()
+            || ctrl.me().bit_is_set()
+            || ctrl.pge().bit_is_set()
+        {
             ctrl = self.regs.ctrl().read();
         }
     }
@@ -62,29 +63,23 @@ impl Flash {
 
         // msdk sets clkdiv everytime
         let sysclock = Gcr::with(|gcr| gcr.get_sysclock_frequency());
-        self.regs.clkdiv().write(|clckdiv| {
-            clckdiv.clkdiv().variant((sysclock / 1000000) as u8)
-        });
+        self.regs
+            .clkdiv()
+            .write(|clckdiv| clckdiv.clkdiv().variant((sysclock / 1000000) as u8));
 
         // clear old errors
-        self.regs.intr().modify(|_, intr| {
-            intr.af().clear_bit()
-        });
+        self.regs.intr().modify(|_, intr| intr.af().clear_bit());
 
         // unlock flash controller
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.unlock().unlocked()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.unlock().unlocked());
     }
 
     /// Locks flash controller.
-    /// 
+    ///
     /// This means a cpu exception will be raised if any flash operations
     /// are attempted to be performed while the controller is locked.
     fn lock_flash(&self) {
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.unlock().locked()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.unlock().locked());
     }
 
     /// Checks if an error has occured with the flash controller, and clears the error if present.
@@ -129,13 +124,13 @@ impl Flash {
     }
 
     /// Erases the page at the given address.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if address is not flash page aligned.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// Must not erase any page with executable code, or any page that a refrence currently points to.
     pub unsafe fn erase_page(&self, address: usize) -> Result<(), HalError> {
         assert_eq!(address & PAGE_MASK, address, "address not page aligned");
@@ -144,13 +139,11 @@ impl Flash {
 
         self.set_address(address);
 
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.erase_code().erase_page()
-        });
+        self.regs
+            .ctrl()
+            .modify(|_, ctrl| ctrl.erase_code().erase_page());
 
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.pge().start()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.pge().start());
 
         self.await_not_busy();
 
@@ -165,7 +158,7 @@ impl Flash {
     /// Writes 16 bytes of data to a 16 byte aligned address
     ///
     /// # Safety
-    /// 
+    ///
     /// Must not write to any bytes with executable code, or any bytes that a refrence currently points to.
     pub unsafe fn write16(&self, address: usize, data: &[u8; 16]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
@@ -183,9 +176,7 @@ impl Flash {
             });
         }
 
-        self.regs.ctrl().modify(|_, ctrl| {
-            ctrl.wr().start()
-        });
+        self.regs.ctrl().modify(|_, ctrl| ctrl.wr().start());
 
         self.await_not_busy();
 
@@ -198,11 +189,11 @@ impl Flash {
     }
 
     /// Writes the bytes to the given address.
-    /// 
+    ///
     /// If the length is not 16 byte aligned, the extra bytes are filled with 0s
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the address i not 16 byte aligned
     pub unsafe fn write(&self, address: usize, data: &[u8]) -> Result<(), HalError> {
         assert_eq!(address & ADDR_MASK, address, "address not 128 byte aligned");
@@ -216,7 +207,7 @@ impl Flash {
         let mut buf = [0; 16];
         let remainder_len = chunks.remainder().len();
         if remainder_len == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         buf[..remainder_len].copy_from_slice(&data[(data.len() - remainder_len)..]);
@@ -227,14 +218,18 @@ impl Flash {
     }
 
     /// Locks a page in flash memory.
-    /// 
+    ///
     /// Locked pages cannot be written to or erased until device is reset.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if `page_address` is not the first address of a valid flash page.
     pub fn lock_page(&self, page_address: usize) {
-        assert_eq!(page_address & PAGE_MASK, page_address, "address not page aligned");
+        assert_eq!(
+            page_address & PAGE_MASK,
+            page_address,
+            "address not page aligned"
+        );
         assert!(
             page_address >= FLASH_BASE_ADDR && page_address < FLASH_BASE_ADDR + FLASH_SIZE,
             "address does not correspond to flash memory",
@@ -252,14 +247,14 @@ impl Flash {
 
         if page_number >= 32 {
             // safety: any bit in welr0 register can be written to to lock a flash page
-            self.regs.welr0().write(|welr0| unsafe {
-                welr0.bits(flash_lock_bit)
-            });
+            self.regs
+                .welr0()
+                .write(|welr0| unsafe { welr0.bits(flash_lock_bit) });
         } else {
             // safety: any bit in welr1 register can be written to to lock a flash page
-            self.regs.welr1().write(|welr1| unsafe {
-                welr1.bits(flash_lock_bit)
-            });
+            self.regs
+                .welr1()
+                .write(|welr1| unsafe { welr1.bits(flash_lock_bit) });
         }
     }
 }

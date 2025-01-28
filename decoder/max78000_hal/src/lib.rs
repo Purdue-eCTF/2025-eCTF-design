@@ -6,17 +6,17 @@ pub mod gcr;
 pub mod gpio;
 pub mod i2c;
 pub mod led;
+pub mod prelude;
 pub mod timer;
 pub mod trng;
 pub mod uart;
-pub mod prelude;
 
 use thiserror_no_std::Error;
 
 pub use flash::Flash;
 pub use gcr::Gcr;
 pub use gpio::Gpio;
-pub use i2c::{UninitializedI2c, MasterI2c, ClientI2c};
+pub use i2c::{ClientI2c, MasterI2c, UninitializedI2c};
 pub use trng::Trng;
 pub use uart::Uart;
 
@@ -51,10 +51,8 @@ pub struct Peripherals {
 impl Peripherals {
     /// Initializes all peripherals and returns them.
     pub fn take() -> Option<Peripherals> {
-        let cortex_m::peripheral::Peripherals {
-            SYST,
-            ..
-        } = cortex_m::peripheral::Peripherals::take()?;
+        let cortex_m::peripheral::Peripherals { SYST, .. } =
+            cortex_m::peripheral::Peripherals::take()?;
 
         let max78000_device::Peripherals {
             FLC,

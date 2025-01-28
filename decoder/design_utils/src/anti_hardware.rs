@@ -1,8 +1,8 @@
 //! Utilities to defend against hardware glitching attacks
 
 // this is pub use for proc macros to find it
+pub use design_macros::{check_or_error_jump_table, create_mutations, rand_ops};
 pub use rand_core::RngCore;
-pub use design_macros::{check_or_error_jump_table, rand_ops, create_mutations};
 
 /// Performs the check multiple times if the check is true to protect against glitch attacks
 #[macro_export]
@@ -49,7 +49,12 @@ macro_rules! multi_if {
 #[macro_export]
 macro_rules! const_time_equal_or_error {
     ($a:expr, $b:expr, $error:expr, $rand:expr,) => {
-        $crate::multi_if!($crate::subtle::ConstantTimeEq::ct_eq($a, $b).into(), (), {return Err($error)}, $rand,);
+        $crate::multi_if!(
+            $crate::subtle::ConstantTimeEq::ct_eq($a, $b).into(),
+            (),
+            { return Err($error) },
+            $rand,
+        );
     };
 }
 

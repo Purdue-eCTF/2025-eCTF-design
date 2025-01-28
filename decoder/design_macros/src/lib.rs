@@ -1,9 +1,16 @@
 use proc_macro::TokenStream;
 
 use proc_macro2::Span;
-use rand::{rngs::OsRng, Rng, seq::SliceRandom};
-use syn::{parse::{Parse, ParseStream}, parse_macro_input, punctuated::Punctuated, token::{Gt, Lt}, BinOp, Error, Expr, ExprPath, Generics, Ident, Path, PathArguments, PathSegment, Result, Token, TypeBareFn};
 use quote::quote;
+use rand::{rngs::OsRng, seq::SliceRandom, Rng};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    punctuated::Punctuated,
+    token::{Gt, Lt},
+    BinOp, Error, Expr, ExprPath, Generics, Ident, Path, PathArguments, PathSegment, Result, Token,
+    TypeBareFn,
+};
 
 /// The total amount the counter will be incramented throughout all the checks
 const TOTAL_INCRAMENT_AMOUNT: u8 = 100;
@@ -34,7 +41,10 @@ impl Parse for Args {
         let _ = <Token![,]>::parse(input)?;
 
         let Expr::Tuple(success_args) = Expr::parse(input)? else {
-            return Err(Error::new(Span::call_site(), "expected a tuple of arguments to call success function with"));
+            return Err(Error::new(
+                Span::call_site(),
+                "expected a tuple of arguments to call success function with",
+            ));
         };
         let _ = <Token![,]>::parse(input)?;
 
@@ -71,7 +81,7 @@ fn panic_fn() -> Expr {
         segments,
     };
 
-    Expr::Path(ExprPath { 
+    Expr::Path(ExprPath {
         attrs: Vec::new(),
         qself: None,
         path,
@@ -79,11 +89,10 @@ fn panic_fn() -> Expr {
 }
 
 /// Creates a mutate function that must be called n times on 0 to reach a specified constant
-/// 
+///
 /// Used for glitch protection
 #[proc_macro]
 pub fn create_mutations(item: TokenStream) -> TokenStream {
-    
     let input = parse_macro_input!(item as syn::LitInt);
     let number: usize = input.base10_parse().unwrap();
     let op_idx: u8 = OsRng.gen();
@@ -93,12 +102,12 @@ pub fn create_mutations(item: TokenStream) -> TokenStream {
         0 => {
             let minus = Token![-](Span::call_site());
             BinOp::Sub(minus)
-        },
+        }
         1 => {
             let add = Token![+](Span::call_site());
             BinOp::Add(add)
-        },
-        _ => todo!()
+        }
+        _ => todo!(),
     };
 
     let mut final_val = quote!(0);
@@ -110,16 +119,15 @@ pub fn create_mutations(item: TokenStream) -> TokenStream {
     for _ in 0..number {
         final_val.extend(mutate.clone());
     }
-    
+
     quote!(
         const VERIFIED_VALUE: i32 = #final_val;
         fn mutate(val: &mut i32) {
             *val = *val #mutate;
         }
-    ).into()
+    )
+    .into()
 }
-
-
 
 #[proc_macro]
 pub fn check_or_error_jump_table(item: TokenStream) -> TokenStream {
@@ -129,10 +137,16 @@ pub fn check_or_error_jump_table(item: TokenStream) -> TokenStream {
 
     let (jump_table_start_index, op) = if jump_table_correct_index < 128 {
         let minus_eq = Token![-=](Span::call_site());
-        (jump_table_correct_index + TOTAL_INCRAMENT_AMOUNT, BinOp::SubAssign(minus_eq))
+        (
+            jump_table_correct_index + TOTAL_INCRAMENT_AMOUNT,
+            BinOp::SubAssign(minus_eq),
+        )
     } else {
         let add_eq = Token![+=](Span::call_site());
-        (jump_table_correct_index - TOTAL_INCRAMENT_AMOUNT, BinOp::AddAssign(add_eq))
+        (
+            jump_table_correct_index - TOTAL_INCRAMENT_AMOUNT,
+            BinOp::AddAssign(add_eq),
+        )
     };
 
     let mut jump_table_punctuated: Punctuated<Expr, Token![,]> = Punctuated::new();
@@ -283,5 +297,6 @@ pub fn rand_ops(input: TokenStream) -> TokenStream {
                 _ => panic!("impossible check"),
             }
         }
-    }}.into()
+    }}
+    .into()
 }

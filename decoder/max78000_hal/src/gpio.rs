@@ -70,10 +70,7 @@ impl Gpio {
             gcr.set_gpio2_clock_enabled(true);
         });
 
-        Gpio {
-            gpio0,
-            gpio2,
-        }
+        Gpio { gpio0, gpio2 }
     }
 
     /// Initializes the global `Gpio` instance.
@@ -129,7 +126,7 @@ macro_rules! make_configure_io {
                     // safety: any bits in the en2_clr register can be set
                     unsafe { en2_clr.bits($options.pin_mask) }
                 });
-            },
+            }
             GpioPinFunction::Output => {
                 $regs.outen_set().write(|outen_set| {
                     // safety: any bits in the outen_set register can be set
@@ -156,7 +153,7 @@ macro_rules! make_configure_io {
                     // safety: any bits in the en2_clr register can be set
                     unsafe { en2_clr.bits($options.pin_mask) }
                 });
-        
+
                 $regs.en1_clr().write(|en1_clr| {
                     // safety: any bits in the en1_clr register can be set
                     unsafe { en1_clr.bits($options.pin_mask) }
@@ -166,7 +163,7 @@ macro_rules! make_configure_io {
                     // safety: any bits in the en0_clr register can be set
                     unsafe { en0_clr.bits($options.pin_mask) }
                 });
-            },
+            }
         }
 
         // only 2 of the pad modes supported, theo only ones we need
@@ -176,18 +173,18 @@ macro_rules! make_configure_io {
                     // safety: any bits in the padctrl0 register can be set
                     unsafe { padctrl.bits(val.bits() & !$options.pin_mask) }
                 });
-        
+
                 $regs.padctrl1().modify(|val, padctrl| {
                     // safety: any bits in the padctrl1 register can be set
                     unsafe { padctrl.bits(val.bits() & !$options.pin_mask) }
                 });
-            },
+            }
             GpioPadConfig::PullUp => {
                 $regs.padctrl0().modify(|val, padctrl| {
                     // safety: any bits in the padctrl0 register can be set
                     unsafe { padctrl.bits(val.bits() | $options.pin_mask) }
                 });
-        
+
                 $regs.padctrl1().modify(|val, padctrl| {
                     // safety: any bits in the padctrl1 register can be set
                     unsafe { padctrl.bits(val.bits() & !$options.pin_mask) }
@@ -197,7 +194,7 @@ macro_rules! make_configure_io {
                     // safety: any bits in the ps register can be set
                     unsafe { ps.bits(val.bits() | $options.pin_mask) }
                 });
-            },
+            }
         }
 
         $regs.vssel().modify(|val, vssel| {
@@ -231,13 +228,13 @@ impl Gpio {
                     // safety: any bits in the out_set register can be set
                     unsafe { out_set.bits(pins) }
                 })
-            },
+            }
             GpioType::Gpio2 => {
                 self.gpio2.out_set().write(|out_set| {
                     // safety: any bits in the out_set register can be set
                     unsafe { out_set.bits(pins) }
                 })
-            },
+            }
         }
     }
 
@@ -249,13 +246,13 @@ impl Gpio {
                     // safety: any bits in the out_clr register can be set
                     unsafe { out_clr.bits(pins) }
                 })
-            },
+            }
             GpioType::Gpio2 => {
                 self.gpio2.out_clr().write(|out_clr| {
                     // safety: any bits in the out_clr register can be set
                     unsafe { out_clr.bits(pins) }
                 })
-            },
+            }
         }
     }
 
@@ -267,13 +264,13 @@ impl Gpio {
                     // safety: any bits in the out register can be set
                     unsafe { out.bits(val.bits() ^ pins) }
                 });
-            },
+            }
             GpioType::Gpio2 => {
                 self.gpio2.out().modify(|val, out| {
                     // safety: any bits in the out register can be set
                     unsafe { out.bits(val.bits() ^ pins) }
                 });
-            },
+            }
         }
     }
 }

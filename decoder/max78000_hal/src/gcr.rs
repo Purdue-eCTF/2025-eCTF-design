@@ -1,15 +1,17 @@
 use core::cell::RefCell;
 
-use cortex_m::interrupt::{Mutex, self};
+use cortex_m::interrupt::{self, Mutex};
 use max78000_device::{gcr::clkctrl::SYSCLK_SEL_A, GCR, LPGCR};
 
-use crate::{ERTCO_FREQUENCY, EXTCLK_FREQUECNY, IBRO_FREQUENCY, INRO_FREQUENCY, IPO_FREQUENCY, ISO_FREQUENCY};
+use crate::{
+    ERTCO_FREQUENCY, EXTCLK_FREQUECNY, IBRO_FREQUENCY, INRO_FREQUENCY, IPO_FREQUENCY, ISO_FREQUENCY,
+};
 
 /// Stores gcr used by all peripherals
 static GCR: Mutex<RefCell<Option<Gcr>>> = Mutex::new(RefCell::new(None));
 
 /// Global configuration registers.
-/// 
+///
 /// Used for controlling certain global features of the device and enabling other peripherals and such.
 pub struct Gcr {
     regs: GCR,
@@ -18,9 +20,9 @@ pub struct Gcr {
 
 impl Gcr {
     /// Executes the given closure and gives it exclusive access to the gcr
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// panics if the gcr is not initialized
     pub fn with<T>(f: impl FnOnce(&mut Gcr) -> T) -> T {
         interrupt::free(|token| {
@@ -30,9 +32,9 @@ impl Gcr {
     }
 
     /// Initialize the gcr
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// panics if the gcr is already initialized
     pub fn init(gcr: GCR, lpgcr: LPGCR) {
         interrupt::free(|token| {
@@ -48,7 +50,12 @@ impl Gcr {
 
     /// Gets the frequency of system clock in ticks per second.
     pub fn get_sysclock_frequency(&self) -> u32 {
-        let clock_source = self.regs.clkctrl().read().sysclk_sel().variant()
+        let clock_source = self
+            .regs
+            .clkctrl()
+            .read()
+            .sysclk_sel()
+            .variant()
             .expect("invalid system clock selected");
 
         // TODO: maybe specify certain clock to use
@@ -84,7 +91,7 @@ impl Gcr {
     }
 
     /// Enables the IBRO (Internal Baurd Rate Oscillator) clock.
-    /// 
+    ///
     /// This clock is used by the uart for timing purposes.
     pub fn enable_ibro_clock(&self) {
         self.regs.clkctrl().modify(|_, clckctrl| {
@@ -98,40 +105,40 @@ impl Gcr {
     }
 
     pub fn set_uart0_clock_enabled(&mut self, enabled: bool) {
-        self.regs.pclkdis0().modify(|_, clock| {
-            clock.uart0().bit(!enabled)
-        });
+        self.regs
+            .pclkdis0()
+            .modify(|_, clock| clock.uart0().bit(!enabled));
     }
 
     pub fn set_i2c1_clock_enabled(&mut self, enabled: bool) {
-        self.regs.pclkdis0().modify(|_, clock| {
-            clock.i2c1().bit(!enabled)
-        });
+        self.regs
+            .pclkdis0()
+            .modify(|_, clock| clock.i2c1().bit(!enabled));
     }
 
     pub fn set_gpio0_clock_enabled(&mut self, enabled: bool) {
-        self.regs.pclkdis0().modify(|_, clock| {
-            clock.gpio0().bit(!enabled)
-        });
+        self.regs
+            .pclkdis0()
+            .modify(|_, clock| clock.gpio0().bit(!enabled));
     }
 
     pub fn set_gpio2_clock_enabled(&mut self, enabled: bool) {
-        self.low_power_regs.pclkdis().modify(|_, clock| {
-            clock.gpio2().bit(!enabled)
-        });
+        self.low_power_regs
+            .pclkdis()
+            .modify(|_, clock| clock.gpio2().bit(!enabled));
     }
 
     pub fn set_trng_clock_enabled(&mut self, enabled: bool) {
-        self.regs.pclkdis1().modify(|_, clock| {
-            clock.trng().bit(!enabled)
-        });
+        self.regs
+            .pclkdis1()
+            .modify(|_, clock| clock.trng().bit(!enabled));
     }
 
     /// Flushes the instruction cache, and perhaps some other caches.
     pub fn flush_cache(&mut self) {
-        self.regs.sysctrl().modify(|_, sysctrl| {
-            sysctrl.icc0_flush().set_bit()
-        });
+        self.regs
+            .sysctrl()
+            .modify(|_, sysctrl| sysctrl.icc0_flush().set_bit());
 
         while self.regs.sysctrl().read().icc0_flush().bit_is_set() {}
     }

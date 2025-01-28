@@ -1,4 +1,6 @@
-use crate::gpio::{Gpio, ConfigureIoOptions, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType};
+use crate::gpio::{
+    ConfigureIoOptions, Gpio, GpioPadConfig, GpioPinFunction, GpioPinVoltage, GpioType,
+};
 
 /// GPIO configurations for each color of led
 const LED_GPIO_PINS: [ConfigureIoOptions; 3] = [
@@ -39,7 +41,7 @@ pub enum Led {
 
 impl Led {
     /// Converts integer index to specified led.
-    /// 
+    ///
     /// Mainly used for functions that c code calls.
     pub fn from_index(index: u32) -> Option<Led> {
         match index {

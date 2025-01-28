@@ -13,7 +13,7 @@ class KeyNode:
         self.depth = depth
     
     def gen_left_node(self, depth):
-        leftcha = ChaCha20_Poly1305.new(self.chacha[:len(self.chacha)]//2)
+        leftcha = ChaCha20_Poly1305.new(self.chacha[:len(self.chacha)//2])
         if (self.time == None): 
             self.time = [0]
             self.left = KeyNode(chacha = leftcha, time=self.time, depth=depth)

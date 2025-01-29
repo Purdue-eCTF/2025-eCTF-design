@@ -1,5 +1,5 @@
 use core::{
-    fmt::{self},
+    fmt::{self, Display, Write},
     time::Duration,
 };
 
@@ -56,4 +56,27 @@ pub fn write_debug_message(message: &str) -> Result<(), MessageError> {
         debug_message.write()?;
     }
     Ok(())
+}
+
+/// Sends the given `message` bytes as the body of an error packet to the host tools.
+pub fn write_error_bytes(message: &[u8]) -> Result<(), MessageError> {
+    // error can't be split across blocks I think
+    // otherwise we might have a situation where host tools reports error for next command also
+    assert!(message.len() <= MAX_BODY_SIZE);
+
+    let error_message = Message::from_data(Opcode::Error, message);
+    error_message.write()
+}
+
+/// Sends the error message for an error back to the host tools in an error packet.
+pub fn write_error<E: Display>(error: &E) -> Result<(), MessageError> {
+    let mut message_buf = [0; MAX_BODY_SIZE];
+    let mut writer = SliceWriteWrapper::new(&mut message_buf);
+
+    if write!(writer, "{}", error).is_ok() {
+        let error_len = writer.offset;
+        write_error_bytes(&message_buf[..error_len])
+    } else {
+        write_error_bytes(b"Error occured (error too long to send)")
+    }
 }

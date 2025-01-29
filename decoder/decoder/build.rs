@@ -1,4 +1,4 @@
-use argon2::{Argon2, Algorithm, Version, Params};
+use argon2::{Algorithm, Argon2, Params, Version};
 use ed25519_dalek::{SecretKey, SigningKey, PUBLIC_KEY_LENGTH};
 use rand::rngs::ThreadRng;
 use rand::Rng;

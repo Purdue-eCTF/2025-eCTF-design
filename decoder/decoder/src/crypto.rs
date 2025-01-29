@@ -2,7 +2,7 @@ use bytemuck::{from_bytes, Pod, Zeroable};
 use chacha20poly1305::{AeadInPlace, KeyInit, XChaCha20Poly1305};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey, SIGNATURE_LENGTH};
 use rand_chacha::ChaCha20Rng;
-use rand_core::{SeedableRng, RngCore};
+use rand_core::{RngCore, SeedableRng};
 
 use crate::DecoderError;
 

@@ -15,7 +15,7 @@ use max78000_hal::uart::uart;
 use max78000_hal::HalError;
 use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
-use utils::SliceWriteWrapper;
+use utils::{write_error, SliceWriteWrapper};
 
 mod crypto;
 mod decode;
@@ -86,8 +86,8 @@ fn main() -> ! {
                 _ => Ok(()),
             };
 
-            if let Err(_error) = result {
-                todo!("report error");
+            if let Err(error) = result {
+                write_error(&error).expect("Failed to report error");
             }
         }
     }

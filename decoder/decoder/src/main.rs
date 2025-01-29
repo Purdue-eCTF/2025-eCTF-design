@@ -33,18 +33,8 @@ pub enum DecoderError {
     CastError(#[from] CheckedCastError),
     #[error("Error casting bytes: {0}")]
     PodCastError(#[from] PodCastError),
-    #[error("An invalid component was detected")]
-    InvalidComponentError,
-    #[error("An invalid pin, secret key, or component id was entered")]
-    InvalidInput,
-    #[error("Command not recognized")]
-    InvalidCommand,
-    #[error("Message with invalid utf8 received: {0}")]
-    InvalidUtf8(#[from] Utf8Error),
     #[error("Error: Suspicious activity detected")]
     SuspiciousActivity,
-    #[error("Error: conditions for boot are not met")]
-    InvalidBootConditions,
     #[error("Error: invalid payload recieved")]
     InvalidEncoderPayload,
     #[error("Error: subscription is not valid for decoding the given frame")]

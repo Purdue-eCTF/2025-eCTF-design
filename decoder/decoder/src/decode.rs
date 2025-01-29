@@ -122,6 +122,9 @@ fn derive_decoder_key_for_timestamp(subscription: &SubscriptionEntry, mut timest
         } else {
             key.copy_from_slice(&expanded_key[32..]);
         }
+
+        // shift next bit to check to high bit
+        timestamp = timestamp << 1;
     }
 
     Some(key)

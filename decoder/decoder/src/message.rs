@@ -107,7 +107,6 @@ impl Message {
         &mut self.body[..self.length.into()]
     }
 
-    // TODO: better error handling
     #[inline]
     pub fn read_header() -> Result<Self, MessageError> {
         let reader = uart();
@@ -123,10 +122,7 @@ impl Message {
         };
 
         let mut length = [0, 0];
-        for b in length.iter_mut() {
-            // reader.read_bytes() special-cases newlines, which we don't want
-            *b = reader.read_byte();
-        }
+        reader.read_bytes(&mut length);
         let length = u16::from_le_bytes(length);
         Ok(Self {
             opcode,
@@ -143,9 +139,7 @@ impl Message {
 
         if message.length != 0 {
             for chunk in message.body[..message.length.into()].chunks_mut(CHUNK_SIZE) {
-                for b in chunk.iter_mut() {
-                    *b = reader.read_byte();
-                }
+                reader.read_bytes(chunk);
                 Self::send_ack();
             }
         }
@@ -173,9 +167,7 @@ impl Message {
 
         writer.write_byte(MAGIC);
         writer.write_byte(self.opcode.into());
-        for b in self.length.to_le_bytes() {
-            writer.write_byte(b);
-        }
+        writer.write_bytes(&self.length.to_le_bytes());
     }
 
     pub fn write(&self) -> Result<(), MessageError> {
@@ -187,9 +179,7 @@ impl Message {
 
         if self.length != 0 {
             for chunk in self.body[..self.length.into()].chunks(CHUNK_SIZE) {
-                for b in chunk.iter().copied() {
-                    writer.write_byte(b);
-                }
+                writer.write_bytes(chunk);
                 if !NACKS.contains(&self.opcode) {
                     Self::read_ack()?;
                 }

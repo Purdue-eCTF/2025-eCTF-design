@@ -11,6 +11,8 @@ pub enum MessageError {
     IncorrectMagic(u8),
     #[error("Nonzero body length on ACK packet")]
     AckError,
+    #[error("Body too long")]
+    BodyLengthError,
 }
 
 /*
@@ -186,6 +188,13 @@ impl Message {
             }
         }
         Ok(())
+    }
+    pub fn send_data(opcode: Opcode, data: &[u8]) -> Result<(), MessageError> {
+        if data.len() > MAX_BODY_SIZE {
+            return Err(MessageError::BodyLengthError);
+        }
+        let msg = Message::from_data(opcode, data);
+        msg.write()
     }
 
     pub const fn ack() -> Self {

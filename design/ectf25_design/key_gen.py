@@ -20,7 +20,7 @@ class KeyNode:
         return self.left
     
     def gen_right_node(self, depth):
-        rightcha = compute_chacha_block(self.key)[:len(self.key)]
+        rightcha = compute_chacha_block(self.key)[len(self.key):]
         if (self.time == None): 
             self.time = [1]
             self.right = KeyNode(key = rightcha, time=self.time, depth=depth)
@@ -75,7 +75,7 @@ def generate_timestamp(node: KeyNode, time, k):
         return generate_timestamp(node.left, time[:-1], k+1)
     elif time and time[-1] == '1':
         node.gen_right_node(k)
-        return generate_timestamp(node.left, time[:-1], k+1)
+        return generate_timestamp(node.right, time[:-1], k+1)
     else:
         return node.key
         

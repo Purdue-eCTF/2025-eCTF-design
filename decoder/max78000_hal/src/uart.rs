@@ -131,28 +131,15 @@ impl Uart {
         self.regs.fifo().read().data().bits()
     }
 
-    /// Reads in bytes to the buffer, and returns a slice to the section which was successfully read
-    // behavior of echoing bytes back and crlf emulates msdk's behavior with _read and _write
-    pub fn read_bytes<'a>(&self, buffer: &'a mut [u8]) -> &'a [u8] {
-        for (i, byte) in buffer.iter_mut().enumerate() {
+    /// Reads in bytes to a buffer
+    pub fn read_bytes(&self, buffer: &mut [u8]) {
+        for byte in buffer.iter_mut() {
             *byte = self.read_byte();
-            self.write_byte(*byte);
-
-            if *byte == b'\r' {
-                *byte = b'\n';
-                return &buffer[..(i + 1)];
-            }
         }
-
-        buffer
     }
 
     pub fn write_bytes(&self, buffer: &[u8]) {
         for byte in buffer {
-            if *byte == b'\n' {
-                self.write_byte(b'\r');
-            }
-
             self.write_byte(*byte);
         }
     }
@@ -161,23 +148,6 @@ impl Uart {
         self.regs.ctrl().modify(|_, ctrl| ctrl.rx_flush().set_bit());
 
         while !self.is_receive_empty() {}
-    }
-
-    fn flush_until_newline(&self) {
-        let mut buf = [0];
-        while self.read_bytes(&mut buf)[0] != b'\n' {}
-    }
-
-    /// Reads a string from uart until newline encountered
-    pub fn recv_input<'a>(&self, buf: &'a mut [u8]) -> Option<&'a str> {
-        let input = self.read_bytes(buf);
-
-        // panic safety: read reads in at least 1 byte
-        if *input.last().unwrap() != b'\n' {
-            self.flush_until_newline();
-        }
-
-        str::from_utf8(input).ok()
     }
 }
 

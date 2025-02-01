@@ -1,7 +1,7 @@
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import eddsa
 from Crypto.Cipher import ChaCha20_Poly1305, ChaCha20
-from Crypto.Hash import SHA256
+from Crypto.Hash import SHA512
 from argon2 import PasswordHasher
 from dataclasses import dataclass
 from typing import Self, Dict, List
@@ -162,7 +162,7 @@ def encrypt_payload(
     # to get eddsa with hashed input, construct hash first
     # otherwise it does some alternative 'pure' mode, which is a tiny bit slower
     # I think the rust library we using does hashed mode?
-    hashed_payload = SHA256.new(payload_to_sign)
+    hashed_payload = SHA512.new(payload_to_sign)
     signature = private_key.sign(hashed_payload)
 
     return signature + payload_to_sign

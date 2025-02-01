@@ -15,9 +15,7 @@ pub fn subscribe(
         decrypt_decoder_payload(subscribe_data, 0, &SUBSCRIPTION_ENC_KEY, &public_key)?;
 
     // TODO: parse subscription and update data in flash
-
-    let response = Message::new(Opcode::Subscribe, 0, [0; 1024]);
-    response.write()?;
+    Message::send_data(Opcode::Subscribe, &[])?;
 
     Ok(())
 }

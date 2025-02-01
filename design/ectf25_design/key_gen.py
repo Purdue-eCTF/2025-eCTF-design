@@ -64,6 +64,20 @@ def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
     elif max_time and max_time[-1] == '1':
         node.gen_right_node(k)
         return generate_tree(node.right, min_time[:-1], max_time[:-1], k+1, nodes_arr)
+    else:
+        # base case: start and end time are exactly the same
+        # just return the corrent node only
+        return [node]
+
+def generate_timestamp(node: KeyNode, time, k):
+    if time and time[-1] == '0':
+        node.gen_left_node(k)
+        return generate_timestamp(node.left, time[:-1], k+1)
+    elif time and time[-1] == '1':
+        node.gen_right_node(k)
+        return generate_timestamp(node.left, time[:-1], k+1)
+    else:
+        return node.key
         
 def gen_minNode(node: KeyNode, min_time, k, nodes_arr):
     k += 1
@@ -119,3 +133,12 @@ def generate_subscription_nodes(root_key: bytes, min_time: int, max_time: int) -
     root_node = KeyNode(key = root_key)
 
     return generate_tree(root_node, format_time(min_time), format_time(max_time), 0, [])
+
+def genereate_key_for_timestamp(root_key: bytes, timestamp: int) -> bytes:
+    """
+    Generates the key for the given timestamp.
+    """
+    verify_timestamp(timestamp)
+
+    root_node = KeyNode(key = root_key)
+    return generate_timestamp(root_node, format_time(timestamp), 0)

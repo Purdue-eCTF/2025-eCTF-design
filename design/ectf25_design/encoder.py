@@ -14,7 +14,7 @@ import argparse
 import struct
 
 from .util import GlobalSecrets, encrypt_payload
-from .key_gen import genereate_key_for_timestamp
+from .node_derivation import derive_node
 
 class Encoder:
     def __init__(self, secrets: bytes):
@@ -58,7 +58,7 @@ class Encoder:
         if channel == 0:
             key = channel_keys.root_key
         else:
-            key = genereate_key_for_timestamp(channel_keys.root_key, timestamp)
+            key = derive_node(channel_keys.root_key, timestamp).key
 
         return encrypt_payload(
             # data is length of frame and frame data padded with 64 bytes

@@ -12,17 +12,17 @@ Copyright: Copyright (c) 2025 The MITRE Corporation
 
 import argparse
 import json
-from pathlib import Path
 import struct
+from pathlib import Path
 
 from loguru import logger
 
-from .util import GlobalSecrets
 from .key_gen import generate_subscription_nodes
+from .util import GlobalSecrets
 
 
 def gen_subscription(
-    secrets: bytes, device_id: int, start: int, end: int, channel: int
+    secrets: bytes, device_id: int, start: int, end: int, channel: int,
 ) -> bytes:
     """Generate the contents of a subscription.
 
@@ -70,10 +70,10 @@ def parse_args():
     )
     parser.add_argument("subscription_file", type=Path, help="Subscription output")
     parser.add_argument(
-        "device_id", type=lambda x: int(x, 0), help="Device ID of the update recipient."
+        "device_id", type=lambda x: int(x, 0), help="Device ID of the update recipient.",
     )
     parser.add_argument(
-        "start", type=lambda x: int(x, 0), help="Subscription start timestamp"
+        "start", type=lambda x: int(x, 0), help="Subscription start timestamp",
     )
     parser.add_argument("end", type=int, help="Subscription end timestamp")
     parser.add_argument("channel", type=int, help="Channel to subscribe to")
@@ -89,7 +89,7 @@ def main():
     args = parse_args()
 
     subscription = gen_subscription(
-        args.secrets_file.read(), args.device_id, args.start, args.end, args.channel
+        args.secrets_file.read(), args.device_id, args.start, args.end, args.channel,
     )
 
     # Print the generated subscription for your own debugging
@@ -104,7 +104,7 @@ def main():
         f.write(subscription)
 
     # For your own debugging. Feel free to remove
-    logger.success(f"Wrote subscription to {str(args.subscription_file.absolute())}")
+    logger.success(f"Wrote subscription to {args.subscription_file.absolute()!s}")
 
 
 if __name__ == "__main__":

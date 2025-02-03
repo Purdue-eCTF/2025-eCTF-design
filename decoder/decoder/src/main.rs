@@ -3,19 +3,16 @@
 
 use bytemuck::PodCastError;
 use bytemuck::{checked::CheckedCastError, must_cast_slice};
-use core::fmt::Write;
 use core::panic::PanicInfo;
-use core::str::Utf8Error;
 use core::time::Duration;
 use cortex_m_rt::entry;
 use decoder_context::DecoderContext;
 use max78000_hal::led::{led_off, led_on, Led};
 use max78000_hal::timer::sleep;
-use max78000_hal::uart::uart;
 use max78000_hal::HalError;
 use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
-use utils::{write_error, SliceWriteWrapper};
+use utils::write_error;
 
 mod crypto;
 mod decode;
@@ -88,25 +85,6 @@ fn panic(info: &PanicInfo) -> ! {
     led_on(Led::Red);
     led_off(Led::Blue);
     led_off(Led::Green);
-    let writer = uart();
-    let mut panic_msg = [0u8; 2048];
-    let mut wrapper = SliceWriteWrapper::new(panic_msg.as_mut_slice());
-    if write!(wrapper, "{}", info).is_ok() {
-        let num_bytes = wrapper.offset;
-        writer.write_byte(message::MAGIC);
-        writer.write_byte(b'E');
-        for b in (num_bytes as u16).to_le_bytes() {
-            writer.write_byte(b);
-        }
-        for b in &panic_msg[..num_bytes] {
-            writer.write_byte(*b);
-        }
-        loop {}
-    }
-    let panic_msg = b"%E\x16\x00panic message too long";
-
-    for b in panic_msg {
-        writer.write_byte(*b);
-    }
+    let _ = utils::write_error(info);
     loop {}
 }

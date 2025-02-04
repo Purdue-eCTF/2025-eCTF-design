@@ -79,10 +79,11 @@ impl Opcode {
 }
 
 pub const MAGIC: u8 = b'%';
-pub const MAX_BODY_SIZE: usize = 1024;
+pub const MAX_BODY_SIZE: usize = 2048;
 const CHUNK_SIZE: usize = 256;
 const NACKS: [Opcode; 2] = [Opcode::Debug, Opcode::Ack];
 
+#[derive(Debug)]
 pub struct Message {
     pub opcode: Opcode,
     pub length: u16,

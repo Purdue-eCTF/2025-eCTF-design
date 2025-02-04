@@ -99,3 +99,29 @@ pub fn write_error<E: Display>(error: &E) -> Result<(), MessageError> {
         write_error_bytes(b"Error occured (error too long to send)")
     }
 }
+
+/// Called internally by print and println macros.
+/// 
+/// Prints formatted info as debug messages.
+pub fn write_debug_format(args: fmt::Arguments) {
+    let mut message_buf = [0; MAX_BODY_SIZE];
+
+    let mut cursor = Cursor::new(&mut message_buf);
+    cursor.write_fmt(args).unwrap();
+    let message_len = cursor.offset;
+
+    Message::send_data(Opcode::Debug, &message_buf[..message_len]).unwrap();
+}
+
+/// Prints to the uart port
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::utils::write_debug_format(format_args!($($arg)*)));
+}
+
+/// Prints to the uart port
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}

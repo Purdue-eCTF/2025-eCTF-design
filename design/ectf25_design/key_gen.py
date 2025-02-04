@@ -31,7 +31,7 @@ class KeyNode:
         return self.right
 
     def time_int(self):
-        return sum(bit << i for i, bit in enumerate(self.time[::-1]))
+        return sum(bit << (63 - i) for i, bit in enumerate(self.time))
 
 
 def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):

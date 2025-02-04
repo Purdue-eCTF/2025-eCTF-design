@@ -22,7 +22,11 @@ from .util import GlobalSecrets
 
 
 def gen_subscription(
-    secrets: bytes, device_id: int, start: int, end: int, channel: int,
+    secrets: bytes,
+    device_id: int,
+    start: int,
+    end: int,
+    channel: int,
 ) -> bytes:
     """Generate the contents of a subscription.
 
@@ -35,20 +39,28 @@ def gen_subscription(
     :param channel: Channel to enable
     """
 
-    secrets = GlobalSecrets.from_json(secrets.decode("ascii"))
+    secrets: GlobalSecrets = GlobalSecrets.from_json(secrets.decode("ascii"))
     channel_keys = secrets.channels[channel]
-
+    public_key = channel_keys.public_key_bytes()
+    print(public_key)
+    assert len(public_key) == 32
     print(list(secrets.subscription_key_for_decoder(device_id)))
-
+    # TODO (sebastian): how do we insure subscription is only for device_id?
+    # TODO (sebastian): what's going on with timestamps?
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
+    assert len(key_nodes) <= 128
+    assert all(len(node.key) == 32 for node in key_nodes)
+    data = (
+        public_key
+        + struct.pack("<QQII", start, end, channel, len(key_nodes))
+        + b"".join([
+            struct.pack("<QI", node.time_int(), node.depth) + node.key
+            for node in key_nodes
+        ])
+    )
 
-    # You can use secrets generated using `gen_secrets` here like:
-    # secrets["some_secrets"]
-    # Which would return "EXAMPLE" in the reference design.
-    # Please note that the secrets are READ ONLY at this sage!
-
-    # Pack the subscription. This will be sent to the decoder with ectf25.tv.subscribe
-    return struct.pack("<IQQI", device_id, start, end, channel)
+    print(f"{len(data) = }")
+    return data
 
 
 def parse_args():
@@ -70,10 +82,14 @@ def parse_args():
     )
     parser.add_argument("subscription_file", type=Path, help="Subscription output")
     parser.add_argument(
-        "device_id", type=lambda x: int(x, 0), help="Device ID of the update recipient.",
+        "device_id",
+        type=lambda x: int(x, 0),
+        help="Device ID of the update recipient.",
     )
     parser.add_argument(
-        "start", type=lambda x: int(x, 0), help="Subscription start timestamp",
+        "start",
+        type=lambda x: int(x, 0),
+        help="Subscription start timestamp",
     )
     parser.add_argument("end", type=int, help="Subscription end timestamp")
     parser.add_argument("channel", type=int, help="Channel to subscribe to")
@@ -89,7 +105,11 @@ def main():
     args = parse_args()
 
     subscription = gen_subscription(
-        args.secrets_file.read(), args.device_id, args.start, args.end, args.channel,
+        args.secrets_file.read(),
+        args.device_id,
+        args.start,
+        args.end,
+        args.channel,
     )
 
     # Print the generated subscription for your own debugging

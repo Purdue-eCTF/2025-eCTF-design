@@ -6,13 +6,13 @@ use bytemuck::{checked::CheckedCastError, must_cast_slice};
 use core::panic::PanicInfo;
 use core::time::Duration;
 use cortex_m_rt::entry;
-use decoder_context::DecoderContext;
+use decoder_context::{DecoderContext, DecoderContextError};
 use max78000_hal::led::{led_off, led_on, Led};
 use max78000_hal::timer::sleep;
 use max78000_hal::HalError;
 use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
-use utils::write_error;
+use utils::{write_error, CursorError};
 
 mod crypto;
 mod decode;
@@ -38,6 +38,10 @@ pub enum DecoderError {
     InvalidSubscription,
     #[error("Messaging error: {0}")]
     MessagingError(#[from] MessageError),
+    #[error("Cursor error: {0}")]
+    CursorError(#[from] CursorError),
+    #[error("Decoder context error: {0}")]
+    DecoderContextError(#[from] DecoderContextError),
 }
 
 fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {

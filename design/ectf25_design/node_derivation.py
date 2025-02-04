@@ -1,5 +1,5 @@
-from .util import verify_timestamp, compute_chacha_block
 from .key_gen import KeyNode
+from .util import compute_chacha_block, verify_timestamp
 
 
 def generate_node(node: KeyNode, time: list[str]):

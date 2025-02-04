@@ -1,12 +1,13 @@
-from Crypto.Random import get_random_bytes
-from Crypto.Signature import eddsa
-from Crypto.Cipher import ChaCha20_Poly1305, ChaCha20
-from argon2 import PasswordHasher
-from dataclasses import dataclass
-from typing import Self, Dict, List
 import base64
 import json
 import struct
+from dataclasses import dataclass
+from typing import Dict, List, Self
+
+from argon2 import PasswordHasher
+from Crypto.Cipher import ChaCha20, ChaCha20_Poly1305
+from Crypto.Random import get_random_bytes
+from Crypto.Signature import eddsa
 
 
 def random(n: int) -> bytes:
@@ -41,6 +42,12 @@ class ChannelKey:
     def signing_key(self) -> eddsa.EdDSASigScheme:
         return bytes_to_eddsa_key(self.private_key)
 
+    def public_key_bytes(self) -> bytes:
+        pub_key = eddsa.import_private_key(self.private_key).public_key()
+        raw = pub_key.export_key(format="raw")
+        assert len(raw) == 32
+        return raw
+
     @classmethod
     def generate(cls) -> Self:
         return cls(
@@ -59,7 +66,7 @@ class GlobalSecrets:
     # Ed25519 private key used to sign subscription payloads.
     subscribe_private_key: bytes
 
-    channels: Dict[int, ChannelKey]
+    channels: dict[int, ChannelKey]
 
     def subscribe_signing_key(self) -> eddsa.EdDSASigScheme:
         return bytes_to_eddsa_key(self.subscribe_private_key)
@@ -88,7 +95,7 @@ class GlobalSecrets:
         return base64.b64decode(hash.split("$")[-1] + "=")
 
     @classmethod
-    def generate(cls, channel_ids: List[int]) -> Self:
+    def generate(cls, channel_ids: list[int]) -> Self:
         channels = {}
         # channel 0 always exists
         channels[0] = ChannelKey.generate()

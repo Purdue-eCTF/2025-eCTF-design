@@ -128,7 +128,7 @@ impl SubscriptionEntry {
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct KeySubtree {
-    /// If timeatamp & mask == timestamp_value, timestamp is in this node
+    /// If timestamp & mask == timestamp_value, timestamp is in this node
     pub timestamp_value: u64,
     pub mask: u64,
     /// Amount of bits to shift timestamp to the left after a match to start deriving key

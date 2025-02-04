@@ -7,24 +7,32 @@ use max78000_hal::{
     led::{led_off, led_on, Led},
     timer::sleep,
 };
+use thiserror_no_std::Error;
 
 use crate::message::{Message, MessageError, Opcode, MAX_BODY_SIZE};
 
-pub struct Cursor<'a> {
-    buf: &'a mut [u8],
+pub struct Cursor<T> {
+    buf: T,
     pub offset: usize,
 }
-
-impl<'a> Cursor<'a> {
-    pub fn new(buf: &'a mut [u8]) -> Self {
+#[derive(Debug, Error)]
+pub enum CursorError {
+    #[error("Too many bytes: only {0} remaining")]
+    OversizeError(usize)
+}
+impl<T> Cursor<T>
+where
+    T: AsRef<[u8]>,
+{
+    pub fn new(buf: T) -> Self {
         Cursor { buf, offset: 0 }
     }
     /// Read bytes from this cursor into a buffer.
     /// If there is not enough bytes remaining to do so, return an error with how many bytes are left
-    pub fn read_into(&mut self, other: &mut [u8]) -> Result<(), usize> {
-        let remainder = &self.buf[self.offset..];
+    pub fn read_into(&mut self, other: &mut [u8]) -> Result<(), CursorError> {
+        let remainder = &self.buf.as_ref()[self.offset..];
         if remainder.len() < other.len() {
-            Err(remainder.len())
+            Err(CursorError::OversizeError(remainder.len()))
         } else {
             other.copy_from_slice(&remainder[..other.len()]);
             self.offset += other.len();
@@ -33,10 +41,13 @@ impl<'a> Cursor<'a> {
     }
 }
 
-impl<'a> fmt::Write for Cursor<'a> {
+impl<T> fmt::Write for Cursor<T>
+where
+    T: AsMut<[u8]>,
+{
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let bytes = s.as_bytes();
-        let remainder = &mut self.buf[self.offset..];
+        let remainder = &mut self.buf.as_mut()[self.offset..];
         if remainder.len() < bytes.len() {
             return Err(fmt::Error);
         }

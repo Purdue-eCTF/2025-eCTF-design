@@ -30,6 +30,9 @@ class KeyNode:
         self.right = KeyNode(key=rightcha, time=[*self.time, 1], depth=depth)
         return self.right
 
+    def time_int(self):
+        return sum(bit << i for i, bit in enumerate(self.time[::-1]))
+
 
 def generate_tree(node: KeyNode, min_time, max_time, k, nodes_arr):
     """

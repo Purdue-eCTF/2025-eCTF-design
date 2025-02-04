@@ -81,7 +81,9 @@ def main():
     """
     parser = argparse.ArgumentParser(prog="ectf25_design.encoder")
     parser.add_argument(
-        "secrets_file", type=argparse.FileType("rb"), help="Path to the secrets file",
+        "secrets_file",
+        type=argparse.FileType("rb"),
+        help="Path to the secrets file",
     )
     parser.add_argument("channel", type=int, help="Channel to encode for")
     parser.add_argument("frame", help="Contents of the frame")

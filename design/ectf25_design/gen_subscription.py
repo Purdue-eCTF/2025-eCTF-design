@@ -18,7 +18,7 @@ from pathlib import Path
 from loguru import logger
 
 from .key_gen import generate_subscription_nodes
-from .util import GlobalSecrets, encrypt_payload
+from .util import GlobalSecrets, encrypt_payload, verify_timestamp
 
 
 def gen_subscription(
@@ -42,14 +42,18 @@ def gen_subscription(
     secrets: GlobalSecrets = GlobalSecrets.from_json(secrets.decode("ascii"))
     channel_keys = secrets.channels[channel]
     public_key = channel_keys.public_key_bytes()
-    print(public_key)
     assert len(public_key) == 32
+
+    assert start <= end
+    verify_timestamp(start)
+    verify_timestamp(end)
+
     subscription_symmetric_key = secrets.subscription_key_for_decoder(device_id)
-    # TODO (sebastian): how do we insure subscription is only for device_id?
     # TODO (sebastian): what's going on with timestamps?
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
     assert len(key_nodes) <= 128
     assert all(len(node.key) == 32 for node in key_nodes)
+
     data = (
         public_key
         + struct.pack("<QQII", start, end, channel, len(key_nodes))

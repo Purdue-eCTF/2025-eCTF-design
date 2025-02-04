@@ -1,10 +1,9 @@
+use crate::DecoderError;
 use bytemuck::{from_bytes, Pod, Zeroable};
 use chacha20poly1305::{AeadInPlace, KeyInit, XChaCha20Poly1305};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey, SIGNATURE_LENGTH};
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-
-use crate::DecoderError;
 
 /// Header of a decoder payload
 #[repr(C)]
@@ -75,7 +74,7 @@ pub fn decrypt_decoder_payload<'a>(
 /// Gets a reference to the associated data of the given decoder payload.
 pub fn get_decoder_payload_associated_data<T: Pod>(payload: &[u8]) -> Result<&T, DecoderError> {
     if payload.len() < size_of::<DecoderPayloadHeader>() + size_of::<T>() {
-        return Err(DecoderError::InvalidEncoderPayload);
+        Err(DecoderError::InvalidEncoderPayload)
     } else {
         let associated_data = &payload[payload.len() - size_of::<T>()..];
         Ok(from_bytes(associated_data))

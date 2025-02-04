@@ -85,14 +85,14 @@ class GlobalSecrets:
             hash_len=32,
             salt_len=32,
         )
-        hash = hasher.hash(decoder_id, salt=self.subscribe_root_key)
+        decoder_id_hash = hasher.hash(decoder_id, salt=self.subscribe_root_key)
 
-        print(hash)
+        print(decoder_id_hash)
 
         # returned hash string has many paramaters encoded as well, delimeted by $
         # last element is the hash itself
         # have to add 1 = to base64 because python base64 padding is always mandatory apparently
-        return base64.b64decode(hash.split("$")[-1] + "=")
+        return base64.b64decode(decoder_id_hash.split("$")[-1] + "=")
 
     @classmethod
     def generate(cls, channel_ids: list[int]) -> Self:
@@ -100,8 +100,8 @@ class GlobalSecrets:
         # channel 0 always exists
         channels[0] = ChannelKey.generate()
 
-        for id in channel_ids:
-            channels[id] = ChannelKey.generate()
+        for channel_id in channel_ids:
+            channels[channel_id] = ChannelKey.generate()
 
         return cls(
             subscribe_root_key=random(32),
@@ -114,11 +114,11 @@ class GlobalSecrets:
             "subscribe_root_key": list(self.subscribe_root_key),
             "subscribe_private_key": list(self.subscribe_private_key),
             "channels": {
-                id: {
+                channel_id: {
                     "root_key": list(channel.root_key),
                     "private_key": list(channel.private_key),
                 }
-                for id, channel in self.channels.items()
+                for channel_id, channel in self.channels.items()
             },
         })
 
@@ -130,11 +130,11 @@ class GlobalSecrets:
             subscribe_root_key=bytes(data["subscribe_root_key"]),
             subscribe_private_key=bytes(data["subscribe_private_key"]),
             channels={
-                int(id): ChannelKey(
+                int(channel_id): ChannelKey(
                     root_key=bytes(channel_json["root_key"]),
                     private_key=bytes(channel_json["private_key"]),
                 )
-                for id, channel_json in data["channels"].items()
+                for channel_id, channel_json in data["channels"].items()
             },
         )
 
@@ -147,9 +147,9 @@ def encrypt_payload(
 ):
     """
     This function encrypts and signs all sensitive payloads sent to the decoder,
-    including subsciptions and satelite data.
+    including subsciptions and satellite data.
 
-    `data` will be enccrypted, while `associated_data` will remain unencrypted,
+    `data` will be encrypted, while `associated_data` will remain unencrypted,
     but still verified by decoder.
 
     Payload Format:
@@ -183,12 +183,12 @@ def encrypt_payload(
     return signature + payload_to_sign
 
 
-def compute_chacha_block(input: bytes) -> bytes:
+def compute_chacha_block(data: bytes) -> bytes:
     """Computes 1 length doubling chacha block."""
 
-    assert len(input) == 32
+    assert len(data) == 32
 
-    cipher = ChaCha20.new(key=input, nonce=b"\0" * 8)
+    cipher = ChaCha20.new(key=data, nonce=b"\0" * 8)
 
     # just encrypt 0s to get the keystream
     return cipher.encrypt(b"\0" * 64)

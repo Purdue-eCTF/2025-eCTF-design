@@ -115,7 +115,7 @@ def gen_max_node(node: KeyNode, max_time, k, nodes_arr):
 
 def format_time(timestamp: int) -> str:
     # code required timestamps as list of 0 and 1s, but backwards
-    return list(bin(timestamp)[2:].rjust(64, "0")[::-1])
+    return list(f"{timestamp:064b}"[::-1])
 
 
 def generate_subscription_nodes(

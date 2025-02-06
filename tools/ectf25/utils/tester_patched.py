@@ -1,4 +1,3 @@
-# tester but we patched out the encoder LOL
 """
 Author: Ben Janis
 Date: 2025
@@ -19,10 +18,9 @@ import time
 from pathlib import Path
 from typing import Iterator
 
-from loguru import logger
-
 from ectf25.utils import Encoder
 from ectf25.utils.decoder import DecoderIntf
+from loguru import logger
 
 
 def rand_gen(args) -> Iterator[tuple[int, bytes, int]]:
@@ -39,9 +37,9 @@ def rand_gen(args) -> Iterator[tuple[int, bytes, int]]:
 
         # generate a random frame
         if args.ascii:
-            frame = "".join(
-                random.choices(string.printable, k=args.frame_size)
-            ).encode()
+            frame = "".join(random.choices(string.printable, k=args.frame_size)).encode(
+                "latin-1"
+            )
         else:
             frame = random.randbytes(args.frame_size)
 
@@ -63,7 +61,7 @@ def stdin_gen(_) -> Iterator[tuple[int, bytes, int]]:
             # try to split comma-separated frame into components
             channel, frame, timestamp = raw_in.split(",")
             # yield values for main testing loop
-            yield int(channel, 0), frame.encode(), int(timestamp, 0)
+            yield int(channel, 0), frame.encode("latin-1"), int(timestamp, 0)
         except ValueError:
             logger.warning(
                 "Frame should be in format of 'channel(int),frame(str),timestamp(int)'."
@@ -96,10 +94,10 @@ def json_gen(args) -> Iterator[tuple[int, bytes, int]]:
 
                 # use real timestamp if --real-ts arg was provided
                 if args.real_ts:
-                    timestamp = time.time_ns() / 1000
+                    timestamp = time.time_ns() // 1000
 
                 # yield values to outer loop
-                yield channel, data.encode(), timestamp
+                yield channel, data.encode("latin-1"), timestamp
             except ValueError:
                 logger.warning(
                     "Frame should be in format of '(channel, frame, timestamp)',"
@@ -136,6 +134,11 @@ def parse_args():
         "--delay", "-d", type=float, default=0, help="Delay after frame decoding"
     )
     parser.add_argument("--perf", action="store_true", help="Display performance stats")
+    parser.add_argument(
+        "--timing",
+        action="store_true",
+        help="Error if not meeting timing requirements for encode and decode",
+    )
     parser.add_argument(
         "--stub-encoder",
         action="store_true",
@@ -205,7 +208,8 @@ def parse_args():
     args = parser.parse_args()
 
     if args.port is None and not args.stub_decoder:
-        exit("--port must be provided if not using --stub-decoder")
+        print("--port must be provided if not using --stub-decoder")
+        exit(1)
     return args
 
 
@@ -225,60 +229,80 @@ def main():
 
     # performance stats
     nbytes = 0
-    encoder_time = 0
-    decoder_time = 0
+    encoder_total_time = 0
+    decoder_total_time = 0
 
     try:
         # get frames from generator
         for channel, raw_frame, timestamp in args.frame_generator(args):
             logger.debug(f"RAW IN  C: {channel}, F: {raw_frame}, TS: {timestamp}")
             nbytes += len(raw_frame)
-            raw_frames.append(
-                (channel, raw_frame.decode(errors="backslashreplace"), timestamp)
-            )
+            raw_frames.append((
+                channel,
+                raw_frame.decode("latin-1"),
+                timestamp,
+            ))
 
             # encode frame or use raw frame if encoder stubbed out
             if args.stub_encoder:
                 encoded_frame = raw_frame
-                logger.warning("Encoder stubbed out. Using raw frame")
             else:
                 start = time.perf_counter()
                 encoded_frame = encoder.encode(channel, raw_frame, timestamp)
-                encoder_time += time.perf_counter() - start
+                encoder_total_time += time.perf_counter() - start
 
-            logger.debug(f"ENC OUT {repr(encoded_frame)}")
-            encoded_frames.append(
-                (channel, encoded_frame.decode(errors="backslashreplace"), timestamp)
-            )
+            if not args.stub_encoder:
+                logger.debug(f"ENC OUT {repr(encoded_frame)}")
+            encoded_frames.append((
+                channel,
+                encoded_frame.decode("latin-1"),
+                timestamp,
+            ))
 
             # decode frame or use encoded frame if decoder stubbed out
             if args.stub_decoder:
                 decoded_frame = encoded_frame
-                logger.warning("Decoder stubbed out. Using encoded frame")
             else:
                 start = time.perf_counter()
                 decoded_frame = decoder.decode(encoded_frame)
-                decoder_time += time.perf_counter() - start
+                decoder_time = time.perf_counter() - start
+                if args.timing and decoder_time > 0.150:
+                    logger.error(f"Decode took longer than 0.150s: {decoder_time}s")
+                    exit(1)
+                decoder_total_time += decoder_time
 
             # warn if frame doesn't match
-            if raw_frame != decoded_frame:
+
+            if (
+                not args.stub_decoder
+                and not args.stub_encoder
+                and raw_frame != decoded_frame
+            ):
                 logger.error(f"Decode frame {repr(raw_frame)} != {repr(decoded_frame)}")
 
-            logger.info(f"DEC OUT {repr(decoded_frame)}")
-            decoded_frames.append(
-                (channel, decoded_frame.decode(errors="backslashreplace"), timestamp)
-            )
+            if not args.stub_decoder:
+                logger.info(f"DEC OUT {repr(decoded_frame)}")
+            decoded_frames.append((
+                channel,
+                decoded_frame.decode("latin-1"),
+                timestamp,
+            ))
 
             # print performance stats if requested
             if args.perf:
-                encoder_avg = "N/A" if args.stub_encoder else int(nbytes / encoder_time)
-                decoder_avg = "N/A" if args.stub_decoder else int(nbytes / decoder_time)
+                encoder_avg = (
+                    "N/A" if args.stub_encoder else int(nbytes / encoder_total_time)
+                )
+                decoder_avg = (
+                    "N/A" if args.stub_decoder else int(nbytes / decoder_total_time)
+                )
                 logger.info(
                     f"STATS: encoder {encoder_avg} B/s, decoder {decoder_avg} B/s"
                 )
 
             # sleep if requested
-            time.sleep(args.delay)
+            if args.delay:
+                time.sleep(args.delay)
     finally:
         # dump frames
         if args.dump_raw:

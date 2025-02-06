@@ -6,6 +6,6 @@ services:
     environment:
       - DECODER_ID=0xdeadbeef
     volumes:
-      - ./build_out:/build_out
+      - ./build_out:/out
       - ./decoder:/decoder
-      - ./secrets:/secrets
+      - ./secrets/global.secrets:/global.secrets:ro

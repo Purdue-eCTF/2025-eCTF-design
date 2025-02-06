@@ -62,7 +62,7 @@ struct GlobalSecrets {
 fn main() {
     force_rerun();
     let secrets_file =
-        &std::env::var("LOCAL_SECRETS_FILE").unwrap_or("/secrets/secrets.json".to_string());
+        &std::env::var("LOCAL_SECRETS_FILE").unwrap_or("/global.secrets".to_string());
     let global_secrets = std::fs::read_to_string(secrets_file)
         .map_err(|err| format!("{err}: {secrets_file}"))
         .unwrap();

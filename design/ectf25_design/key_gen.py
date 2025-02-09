@@ -1,21 +1,16 @@
+from dataclasses import dataclass
 from typing import List, Self
 
 from .util import compute_chacha_block, verify_timestamp
 
 
+@dataclass
 class KeyNode:
     key: bytes
-    left: Self | None
-    right: Self | None
     lowest_timestamp: int
     highest_timestamp: int
-
-    def __init__(self, key, lowest_timestamp, highest_timestamp, left=None, right=None):
-        self.left = left
-        self.right = right
-        self.key = key
-        self.lowest_timestamp = lowest_timestamp
-        self.highest_timestamp = highest_timestamp
+    left: Self | None = None
+    right: Self | None = None
 
     def gen_left_node(self):
         leftcha = compute_chacha_block(self.key)[: len(self.key)]
@@ -63,7 +58,7 @@ def generate_tree(
             # otherwise, recursively look for the correct nodes
             else:
                 nodes_arr.extend(
-                    generate_tree(new_node, min_time, max_time, start, end)
+                    generate_tree(new_node, min_time, max_time, start, end),
                 )
     return nodes_arr
 

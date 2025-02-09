@@ -38,7 +38,7 @@ struct FrameData {
 pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<(), DecoderError> {
     let frame_info: FrameAssociatedData = *get_decoder_payload_associated_data(encoded_frame)?;
 
-    println!("decode start: {frame_info:?}");
+    // println!("decode start: {frame_info:?}");
 
     // check frame we are decoding is monotonically increasing for security requirement 3
     if frame_info.timestamp <= context.last_decoded_timestamp {
@@ -48,7 +48,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     let (symmetric_key, public_key) =
         get_keys_for_channel(context, frame_info.channel_number, frame_info.timestamp)?;
 
-    println!("generated keys: {symmetric_key:?}");
+    // println!("generated keys: {symmetric_key:?}");
 
     // frame data has 1 byte at the start indicating how long it is
     // and 64 bytes after containing the data itself
@@ -60,7 +60,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
         &public_key,
     )?;
 
-    println!("decoded: {frame_data:?}");
+    // println!("decoded: {frame_data:?}");
 
     let frame_data: &FrameData = try_from_bytes(frame_data)?;
 

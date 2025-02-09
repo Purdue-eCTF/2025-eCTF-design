@@ -39,14 +39,20 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
         subtrees[i as usize] = subtree;
     }
 
-    Ok(SubscriptionEntry {
+    let subscription = SubscriptionEntry {
         start_time,
         end_time,
         channel_id,
         public_key: channel_public_key,
         subtrees,
         subtree_count,
-    })
+    };
+
+    // make sure subtrees are sorted by lowest timestamp
+    assert!(subscription
+        .active_subtrees()
+        .is_sorted_by_key(|tree| tree.lowest_timestamp));
+    Ok(subscription)
 }
 
 pub fn subscribe(

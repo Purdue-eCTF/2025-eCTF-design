@@ -1,3 +1,5 @@
+use core::cmp::Ordering;
+
 use bytemuck::{try_from_bytes, Pod, Zeroable};
 use ed25519_dalek::VerifyingKey;
 
@@ -129,9 +131,20 @@ fn derive_decoder_key_for_timestamp(
     timestamp: u64,
 ) -> Option<[u8; 32]> {
     // locate subtree root containing the key for the timestamp we are interested in
-    let subtree = subscription.active_subtrees().iter().find(|subtree| {
-        subtree.lowest_timestamp <= timestamp && timestamp <= subtree.highest_timestamp
-    })?;
+    let subtree_idx = subscription
+        .active_subtrees()
+        .binary_search_by(|tree| {
+            if timestamp < tree.lowest_timestamp {
+                Ordering::Greater
+            } else if timestamp > tree.highest_timestamp {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        })
+        .ok()?;
+    let subtree = subscription.active_subtrees()[subtree_idx];
+    assert!(subtree.lowest_timestamp <= timestamp && timestamp <= subtree.highest_timestamp);
 
     let mut lower = subtree.lowest_timestamp;
     let mut upper = subtree.highest_timestamp;

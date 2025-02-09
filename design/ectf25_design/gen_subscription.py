@@ -51,6 +51,17 @@ def gen_subscription(
     subscription_symmetric_key = secrets.subscription_key_for_decoder(device_id)
 
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
+
+    # make sure that we cover the entire start..=end range
+    key_nodes.sort(key=lambda node: node.lowest_timestamp)
+    highest = key_nodes[0].highest_timestamp
+    for node in key_nodes[1:]:
+        assert node.lowest_timestamp == highest + 1
+        highest = node.highest_timestamp
+    assert key_nodes[0].lowest_timestamp == start
+    assert highest == end
+
+    # make sure that we don't have too many nodes
     assert len(key_nodes) <= 128
     assert all(len(node.key) == 32 for node in key_nodes)
 

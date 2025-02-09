@@ -124,7 +124,9 @@ def main():
     # subscriptions in certain scenarios), but feel free to remove
     #
     # NOTE: Printing sensitive data is generally not good security practice
-    logger.debug(f"Generated subscription: {subscription}")
+    logger.debug(
+        f"Generated subscription for {args.start}..={args.end}: {subscription}"
+    )
 
     # Open the file, erroring if the file exists unless the --force arg is provided
     with open(args.subscription_file, "wb" if args.force else "xb") as f:

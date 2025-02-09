@@ -27,16 +27,13 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
 
     let mut subtrees = [Default::default(); 128];
     for i in 0u32..subtree_count {
-        let timestamp_value = read_value(&mut data_cursor)?;
-        let depth: u32 = read_value(&mut data_cursor)?;
-        assert!(depth <= 64);
-        let mask = u64::MAX << (64 - depth);
-        let shift = depth as u64; // TODO (sebastian): what is this supposed to be?
+        let lowest_timestamp = read_value(&mut data_cursor)?;
+        let highest_timestamp = read_value(&mut data_cursor)?;
+
         let key = read_value(&mut data_cursor)?;
         let subtree = KeySubtree {
-            timestamp_value,
-            mask,
-            shift,
+            lowest_timestamp,
+            highest_timestamp,
             key,
         };
         subtrees[i as usize] = subtree;
@@ -46,9 +43,9 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
         start_time,
         end_time,
         channel_id,
-        subtree_count,
         public_key: channel_public_key,
         subtrees,
+        subtree_count,
     })
 }
 

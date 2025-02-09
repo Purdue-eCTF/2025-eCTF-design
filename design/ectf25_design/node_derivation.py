@@ -2,23 +2,15 @@ from .key_gen import KeyNode
 from .util import compute_chacha_block, verify_timestamp
 
 
-def generate_node(node: KeyNode, time: list[str]):
-    k = 0
-    while len(time) > 0:
-        direction = time.pop()
-        k += 1
-        if direction == "0":
-            node = node.gen_left_node(k)
-        elif direction == "1":
-            node = node.gen_right_node(k)
-        else:
-            return None
+# TODO (sebastian): verify that these changes work
+def generate_node(node: KeyNode, time: int):
+    for depth in range(64):
+        # iterate over the bits of `time` from highest-order to lowest-order
+        direction = (time >> (63 - depth)) & 1
+
+        # 0 = left, 1 = right
+        node = node.gen_left_node() if direction == 0 else node.gen_right_node()
     return node
-
-
-def format_time(timestamp: int) -> str:
-    # tree algorithm takes a goofy queue representation of the timestamp
-    return list(bin(timestamp)[2:].rjust(64, "0")[::-1])
 
 
 def derive_node(root_key: bytes, time: int) -> KeyNode:
@@ -30,4 +22,4 @@ def derive_node(root_key: bytes, time: int) -> KeyNode:
 
     root_node = KeyNode(key=root_key)
 
-    return generate_node(root_node, format_time(time))
+    return generate_node(root_node, time)

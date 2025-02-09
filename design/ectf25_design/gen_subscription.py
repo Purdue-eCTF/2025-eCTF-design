@@ -49,7 +49,7 @@ def gen_subscription(
     verify_timestamp(end)
 
     subscription_symmetric_key = secrets.subscription_key_for_decoder(device_id)
-    # TODO (sebastian): what's going on with timestamps?
+
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
     assert len(key_nodes) <= 128
     assert all(len(node.key) == 32 for node in key_nodes)
@@ -58,7 +58,7 @@ def gen_subscription(
         public_key
         + struct.pack("<QQII", start, end, channel, len(key_nodes))
         + b"".join([
-            struct.pack("<QI", node.time_int(), node.depth) + node.key
+            struct.pack("<QQ", node.lowest_timestamp, node.highest_timestamp) + node.key
             for node in key_nodes
         ])
     )

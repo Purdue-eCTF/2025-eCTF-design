@@ -25,7 +25,15 @@ def bytes_to_eddsa_key(key: bytes) -> eddsa.EdDSASigScheme:
 def verify_timestamp(timestamp: int):
     """Asserts the given integer is a valid timestamp."""
 
-    assert timestamp >= 0 and timestamp < (2**64)
+    assert timestamp >= 0
+    assert timestamp < (2**64)
+
+
+def verify_decoder(decoder_id: int):
+    """Asserts the given decoder id is valid."""
+
+    assert decoder_id >= 0
+    assert decoder_id < (2**32)
 
 
 @dataclass
@@ -73,8 +81,8 @@ class GlobalSecrets:
 
     def subscription_key_for_decoder(self, decoder_id: int) -> bytes:
         # decoder id must be 4 byte unsigned integer
-        assert decoder_id >= 0 and decoder_id < (2**32)
-        decoder_id = struct.pack("<I", decoder_id)
+        verify_decoder(decoder_id)
+        decoder_id_bytes = struct.pack("<I", decoder_id)
 
         # use argon2id to derive the decoder subscription key
         # these are the default values, just explicitly specified, and with different salt len
@@ -85,7 +93,7 @@ class GlobalSecrets:
             hash_len=32,
             salt_len=32,
         )
-        decoder_id_hash = hasher.hash(decoder_id, salt=self.subscribe_root_key)
+        decoder_id_hash = hasher.hash(decoder_id_bytes, salt=self.subscribe_root_key)
 
         print(decoder_id_hash)
 
@@ -123,8 +131,8 @@ class GlobalSecrets:
         })
 
     @classmethod
-    def from_json(cls, data: str) -> Self:
-        data = json.loads(data)
+    def from_json(cls, raw_data: str) -> Self:
+        data: dict = json.loads(raw_data)
 
         return cls(
             subscribe_root_key=bytes(data["subscribe_root_key"]),

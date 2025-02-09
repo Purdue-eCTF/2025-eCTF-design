@@ -114,7 +114,7 @@ pub struct SubscriptionEntry {
     /// Public key for channel
     pub public_key: [u8; 32],
     /// Internal nodes used to reconstruct frame keys
-    // 126 is I beleive worse case scenario for how many subtrees we need
+    // 126 is I believe worse case scenario for how many subtrees we need
     pub subtrees: [KeySubtree; 128],
 }
 
@@ -128,12 +128,10 @@ impl SubscriptionEntry {
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Pod, Zeroable)]
 pub struct KeySubtree {
-    /// If timestamp & mask == timestamp_value, timestamp is in this node
-    pub timestamp_value: u64,
-    pub mask: u64,
-    /// Amount of bits to shift timestamp to the left after a match to start deriving key
-    // bigger than needed for padding
-    pub shift: u64,
+    /// The lowest timestamp that this subtree can provide
+    pub lowest_timestamp: u64,
+    /// The highest timestamp that this subtree can provide
+    pub highest_timestamp: u64,
     /// Value of internal node used to derive keys
     pub key: [u8; 32],
 }

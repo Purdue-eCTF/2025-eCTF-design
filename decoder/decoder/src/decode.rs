@@ -7,8 +7,8 @@ use crate::crypto::{
 use crate::decoder_context::SubscriptionEntry;
 use crate::ectf_params::{CHANNEL0_ENC_KEY, CHANNEL0_PUBLIC_KEY};
 use crate::message::{Message, Opcode};
-use crate::{decoder_context::DecoderContext, DecoderError};
 use crate::println;
+use crate::{decoder_context::DecoderContext, DecoderError};
 
 /// Non encrypted associated data sent with frame.
 ///
@@ -45,7 +45,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
 
     let (symmetric_key, public_key) =
         get_keys_for_channel(context, frame_info.channel_number, frame_info.timestamp)?;
-    
+
     println!("generated keys: {symmetric_key:?}");
 
     // frame data has 1 byte at the start indicating how long it is
@@ -122,33 +122,31 @@ fn get_keys_for_channel(
 /// This uses the GGM key tree discussed in design doc.
 fn derive_decoder_key_for_timestamp(
     subscription: &SubscriptionEntry,
-    mut timestamp: u64,
+    timestamp: u64,
 ) -> Option<[u8; 32]> {
     // locate subtree root containing the key for the timestamp we are interested in
-    let subtree = subscription
-        .active_subtrees()
-        .iter()
-        .find(|subtree| timestamp & subtree.mask == subtree.timestamp_value)?;
+    let subtree = subscription.active_subtrees().iter().find(|subtree| {
+        subtree.lowest_timestamp <= timestamp && timestamp <= subtree.highest_timestamp
+    })?;
 
-    // shift out values of timestamp that are on the path to the subtree root (already matched)
-    timestamp = timestamp << subtree.shift;
+    let mut lower = subtree.lowest_timestamp;
+    let mut upper = subtree.highest_timestamp;
 
     let mut key = subtree.key;
-
-    // complete remaining path to leaf node with key
-    for _ in subtree.shift..64 {
+    // shrink upper and lower bounds until we have found the key
+    while lower != upper {
         let expanded_key = compute_chacha_block(key);
 
-        // select portion of expanded key to use as next node in key tree
-        // based on highest order bit of timestamp we have not yet used
-        if timestamp & (1 << 63) == 0 {
+        let lower_midsection = (lower + upper) / 2;
+        let upper_midsection = lower_midsection + 1;
+
+        if timestamp <= lower_midsection {
             key.copy_from_slice(&expanded_key[..32]);
+            upper = lower_midsection;
         } else {
             key.copy_from_slice(&expanded_key[32..]);
+            lower = upper_midsection;
         }
-
-        // shift next bit to check to high bit
-        timestamp = timestamp << 1;
     }
 
     Some(key)

@@ -97,6 +97,10 @@ fn get_keys_for_channel(
         // this check is not necessary since deriving the key should fail,
         // but we do it just in case
         if timestamp < subscription.start_time || timestamp > subscription.end_time {
+            println!(
+                "timestamp was {timestamp}; should be {}..={}",
+                subscription.start_time, subscription.end_time
+            );
             return Err(DecoderError::InvalidEncoderPayload);
         }
 

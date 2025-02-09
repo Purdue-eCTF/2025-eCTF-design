@@ -89,12 +89,12 @@ fn get_keys_for_channel(
             VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY).expect("Invalid public key bytes"),
         ))
     } else {
-        println!("before get subscription");
+        // println!("before get subscription");
         // other channel keys are derived from subscription data
         let Some(subscription) = context.get_subscription_for_channel(channel_number) else {
             return Err(DecoderError::InvalidSubscription);
         };
-        println!("after get subscription");
+        // println!("after get subscription");
 
         // this check is not necessary since deriving the key should fail,
         // but we do it just in case
@@ -106,15 +106,15 @@ fn get_keys_for_channel(
             return Err(DecoderError::InvalidEncoderPayload);
         }
 
-        let trees = subscription.active_subtrees();
-        println!("{trees:?}");
+        // let trees = subscription.active_subtrees();
+        // println!("{trees:?}");
 
         // derive symmetric key based on subscription data and timestamp
         let Some(symmetric_key) = derive_decoder_key_for_timestamp(subscription, timestamp) else {
             return Err(DecoderError::InvalidSubscription);
         };
 
-        println!("after derive");
+        // println!("after derive");
 
         Ok((
             symmetric_key,

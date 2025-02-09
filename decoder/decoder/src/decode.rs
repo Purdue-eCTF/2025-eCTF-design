@@ -103,16 +103,14 @@ fn get_keys_for_channel(
                 "timestamp was {timestamp}; should be {}..={}",
                 subscription.start_time, subscription.end_time
             );
-            return Err(DecoderError::InvalidEncoderPayload);
+            return Err(DecoderError::InvalidTimestampError);
         }
 
         // let trees = subscription.active_subtrees();
         // println!("{trees:?}");
 
         // derive symmetric key based on subscription data and timestamp
-        let Some(symmetric_key) = derive_decoder_key_for_timestamp(subscription, timestamp) else {
-            return Err(DecoderError::InvalidSubscription);
-        };
+        let symmetric_key = derive_decoder_key_for_timestamp(subscription, timestamp)?;
 
         // println!("after derive");
 
@@ -129,7 +127,7 @@ fn get_keys_for_channel(
 fn derive_decoder_key_for_timestamp(
     subscription: &SubscriptionEntry,
     timestamp: u64,
-) -> Option<[u8; 32]> {
+) -> Result<[u8; 32], DecoderError> {
     // locate subtree root containing the key for the timestamp we are interested in
     let subtree_idx = subscription
         .active_subtrees()
@@ -142,7 +140,11 @@ fn derive_decoder_key_for_timestamp(
                 Ordering::Equal
             }
         })
-        .ok()?;
+        .map_err(|_| {
+            println!("Failed to find correct subtree");
+            println!("{:?}", subscription.active_subtrees());
+            DecoderError::NoTimestampFound
+        })?;
     let subtree = subscription.active_subtrees()[subtree_idx];
     assert!(subtree.lowest_timestamp <= timestamp && timestamp <= subtree.highest_timestamp);
 
@@ -166,5 +168,5 @@ fn derive_decoder_key_for_timestamp(
         }
     }
 
-    Some(key)
+    Ok(key)
 }

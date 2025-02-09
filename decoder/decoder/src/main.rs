@@ -32,6 +32,10 @@ pub enum DecoderError {
     PodCastError(#[from] PodCastError),
     #[error("Error: Suspicious activity detected")]
     SuspiciousActivity,
+    #[error("Error: timestamp not found in subtrees")]
+    NoTimestampFound,
+    #[error("Error: timestamp is out of bounds")]
+    InvalidTimestampError,
     #[error("Error: invalid payload recieved")]
     InvalidEncoderPayload,
     #[error("Error: subscription is not valid for decoding the given frame")]

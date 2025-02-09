@@ -20,6 +20,6 @@ def derive_node(root_key: bytes, time: int) -> KeyNode:
 
     verify_timestamp(time)
 
-    root_node = KeyNode(key=root_key)
+    root_node = KeyNode(root_key, 0, 2**64 - 1)
 
     return generate_node(root_node, time)

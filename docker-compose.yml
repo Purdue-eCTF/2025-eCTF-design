@@ -8,4 +8,4 @@ services:
     volumes:
       - ./build_out:/out
       - ./decoder:/decoder
-      - ./secrets/global.secrets:/global.secrets:ro
+      - ./secrets:/secrets:ro

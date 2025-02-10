@@ -42,7 +42,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
 
     // check frame we are decoding is monotonically increasing for security requirement 3
     if frame_info.timestamp <= context.last_decoded_timestamp {
-        return Err(DecoderError::InvalidEncoderPayload);
+        return Err(DecoderError::NonMonotonicTimestamp);
     }
 
     let (symmetric_key, public_key) =
@@ -103,7 +103,7 @@ fn get_keys_for_channel(
                 "timestamp was {timestamp}; should be {}..={}",
                 subscription.start_time, subscription.end_time
             );
-            return Err(DecoderError::InvalidTimestampError);
+            return Err(DecoderError::InvalidTimestamp);
         }
 
         // let trees = subscription.active_subtrees();

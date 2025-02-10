@@ -35,7 +35,9 @@ pub enum DecoderError {
     #[error("Error: timestamp not found in subtrees")]
     NoTimestampFound,
     #[error("Error: timestamp is out of bounds")]
-    InvalidTimestampError,
+    InvalidTimestamp,
+    #[error("Error: non-monotonic timestamp")]
+    NonMonotonicTimestamp,
     #[error("Error: invalid payload recieved")]
     InvalidEncoderPayload,
     #[error("Error: subscription is not valid for decoding the given frame")]

@@ -6,7 +6,6 @@ use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, SUBSCRIPTION_PUBLIC_KEY};
 use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
-use core::{slice, u64};
 
 fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let mut data_cursor = Cursor::new(data);
@@ -28,6 +27,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     for i in 0u32..subtree_count {
         let lowest_timestamp = read_value(&mut data_cursor)?;
         let highest_timestamp = read_value(&mut data_cursor)?;
+        assert!(lowest_timestamp <= highest_timestamp);
 
         let key = read_value(&mut data_cursor)?;
         let subtree = KeySubtree {
@@ -50,7 +50,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     // make sure subtrees are sorted by lowest timestamp
     assert!(subscription
         .active_subtrees()
-        .is_sorted_by_key(|tree| tree.lowest_timestamp));
+        .is_sorted_by_key(|subtree| subtree.lowest_timestamp));
     Ok(subscription)
 }
 
@@ -80,6 +80,7 @@ where
     T: Default + NoUninit + AnyBitPattern,
 {
     let mut data = T::default();
-    cursor.read_into(bytemuck::cast_slice_mut(slice::from_mut(&mut data)))?;
+
+    cursor.read_into(bytemuck::bytes_of_mut(&mut data))?;
     Ok(data)
 }

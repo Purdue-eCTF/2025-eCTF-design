@@ -51,7 +51,8 @@ def generate_tree(
 
     nodes_arr = []
     for start, end, new_node in (left_side, right_side):
-        if (start <= min_time <= end) or (start <= max_time <= end):
+        # if there is any overlap between the two ranges, there's some nodes to check
+        if start <= max_time and min_time <= end:
             # if this node's range is fully inside the target range, just add this node.
             if min_time <= start and end <= max_time:
                 nodes_arr.append(new_node)

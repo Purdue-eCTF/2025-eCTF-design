@@ -8,7 +8,6 @@ use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 use core::{slice, u64};
 
-// TODO (sebastian): can I do unit tests?
 fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let mut data_cursor = Cursor::new(data);
 

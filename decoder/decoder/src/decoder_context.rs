@@ -156,7 +156,7 @@ pub struct DecoderContext {
     /// Data for all subscriptions
     subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
-    pub last_decoded_timestamp: u64,
+    pub last_decoded_timestamp: Option<u64>,
     /// PRNG used for random operations to help prevent glitching
     chacha: ChaCha20Rng,
 }
@@ -184,7 +184,7 @@ impl DecoderContext {
 
         DecoderContext {
             subscriptions,
-            last_decoded_timestamp: 0,
+            last_decoded_timestamp: None,
             chacha,
         }
     }

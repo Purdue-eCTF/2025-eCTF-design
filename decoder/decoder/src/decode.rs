@@ -41,7 +41,10 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     // println!("decode start: {frame_info:?}");
 
     // check frame we are decoding is monotonically increasing for security requirement 3
-    if frame_info.timestamp <= context.last_decoded_timestamp {
+    if context
+        .last_decoded_timestamp
+        .is_some_and(|last_decoded| frame_info.timestamp <= last_decoded)
+    {
         return Err(DecoderError::NonMonotonicTimestamp);
     }
 
@@ -65,7 +68,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     let frame_data: &FrameData = try_from_bytes(frame_data)?;
 
     // decoding succeeded, update last decoded timestamp
-    context.last_decoded_timestamp = frame_info.timestamp;
+    context.last_decoded_timestamp = Some(frame_info.timestamp);
 
     let message = Message::from_data(
         Opcode::Decode,

@@ -18,12 +18,12 @@ args = ["build", "--target", "thumbv7em-none-eabihf", "--profile", "@@decode(BUI
 dependencies = ["decoder_elf"]
 script = [
   "arm-none-eabi-objcopy -O binary ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin --strip-unneeded",
-  "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin /out/max78000.bin"
+  "cp ${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder.bin ${OUT_DIR}/max78000.bin"
 ]
 
 [tasks.decoder_elf_copy]
 command = "cp"
-args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder", "/out/max78000.elf"]
+args = ["${CARGO_TARGET_DIR}/thumbv7em-none-eabihf/${BUILD_TYPE}/decoder", "${OUT_DIR}/max78000.elf"]
 
 [tasks.decoder_elf]
 run_task = { name = ["decoder_elf_build", "decoder_elf_copy"] }

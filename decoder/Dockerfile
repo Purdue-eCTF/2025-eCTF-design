@@ -29,7 +29,7 @@ RUN rustup toolchain install --component rustfmt --component rustc-dev --target 
 
 WORKDIR /decoder
 
-ENTRYPOINT ["bash", "-c", "cd decoder/ && cargo make -e BUILD_TYPE=release -e CARGO_TARGET_DIR=${CURDIR}/target decoder --verbose"]
+ENTRYPOINT ["bash", "-c", "cd decoder/ && cargo make -e BUILD_TYPE=release -e CARGO_TARGET_DIR=${CURDIR}/target -e OUT_DIR=/out decoder --verbose"]
 
 # Sample run command:
 # docker run --rm -v ./build_out:/out -v ./:/decoder -v ./global.secrets:/global.secrets:ro -e DECODER_ID=0xdeadbeef decoder

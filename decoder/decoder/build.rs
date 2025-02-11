@@ -132,6 +132,44 @@ fn main() {
     std::fs::write(out_path.join("ectf_params.rs"), rust_code).unwrap();
 
     // do compile time aslr
+    // ASLR randomizes as following:
+    //
+    // Flash:
+    // |--------------------------------------------------------------------------------|
+    // | .vector_table: always 0x1000e000 (flash origin)                                |
+    // |--------------------------------------------------------------------------------|
+    // | .entry: always 0x1000e200 (flash origin + 0x200) (dictated by ectf bootloader) |
+    // |--------------------------------------------------------------------------------|
+    // |                                                                                |
+    // | Large random gap                                                               |
+    // | (Technically this gap is part of the .text section,                            |
+    // | but it is uninitialized bytes)                                                 |
+    // |                                                                                |
+    // |--------------------------------------------------------------------------------|
+    // | .text                                                                          |
+    // | .rodata                                                                        |
+    // | .data (initial values of data, copied to memory by .entry function)            |
+    // |--------------------------------------------------------------------------------|
+    //
+    // RAM:
+    // |--------------------------------------------------------------------------------|
+    // | .stack: top is stack_start, grows down                                         |
+    // | (will have at least 1/4 ram size to grow down in ram)                          |
+    // |                                                                                |
+    // | stack_start: base of stack, randomly placed in middle half of flash            |
+    // |--------------------------------------------------------------------------------|
+    // |                                                                                |
+    // | Random gap placed between top of stack and .data                               |
+    // |                                                                                |
+    // |--------------------------------------------------------------------------------|
+    // | .data: placed in ram at stack_start + random offset                            |
+    // |--------------------------------------------------------------------------------|
+    // |                                                                                |
+    // | Random gap placed between .data and .bss                                       |
+    // |                                                                                |
+    // |--------------------------------------------------------------------------------|
+    // | .bss                                                                           |
+    // |--------------------------------------------------------------------------------|
     let mut rng = rand::thread_rng();
 
     let flash_length = 0x00038000;
@@ -143,11 +181,15 @@ fn main() {
 
     let sentry = 0x1000e200;
 
-    // by default ap is 192 - 193 kib
-    // this leaves about 12 kib of extra space in maximum size
-    let textoffset = gen_addr(0, 0x4000, &mut rng);
+    // by default decoder is ~92 KiB
+    // flash available for bootloader to flash our code is 224 KiB
+    // if we randomize up to 100 KiB gap in text, we have a margin of error of 32 KiB
+    let textoffset = gen_addr(0, 0x19000, &mut rng);
     let rodataoffset = 0;
-    let dataoffset = gen_addr(0, 0x1000, &mut rng);
+    // this random offset is a bit small since it impacts final binary size
+    // don't want to waste too much space on that, since stack_start randomization already affects data placements
+    // 0x2000 is 8KiB, still under 32 KiB margin of error
+    let dataoffset = gen_addr(0, 0x2000, &mut rng);
     let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
 
     let memory_x = format!("

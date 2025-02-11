@@ -2,6 +2,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use ed25519_dalek::{SecretKey, SigningKey, PUBLIC_KEY_LENGTH};
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand::seq::IteratorRandom;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -39,18 +40,16 @@ fn parse_decoder_id(n: &str) -> u32 {
     n_parsed.expect("could not parse component id")
 }
 
+/// Return bytes of the Ed25519 public key for the given private key.
 fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH] {
     SigningKey::from_bytes(private_key)
         .verifying_key()
         .to_bytes()
 }
 
-#[derive(Debug, Deserialize)]
-struct ChannelSecrets {
-    root_key: [u8; 32],
-    private_key: [u8; 32],
-}
-
+/// Secrets keys in global secrets file.
+/// 
+/// See python secret generation for details.
 #[derive(Debug, Deserialize)]
 struct GlobalSecrets {
     subscribe_root_key: [u8; 32],
@@ -58,9 +57,20 @@ struct GlobalSecrets {
     channels: HashMap<usize, ChannelSecrets>,
 }
 
+/// Secrets for an individual channel.
+/// 
+/// See python secret generation for details.
+#[derive(Debug, Deserialize)]
+struct ChannelSecrets {
+    root_key: [u8; 32],
+    private_key: [u8; 32],
+}
+
 // this build script just parses ap ectf params from inc/ectf_params.h into a rust file $OUT_DIR/ectf_params.rs
+// also does compile time layout randomization
 fn main() {
     force_rerun();
+
     let secrets_file =
         &std::env::var("LOCAL_SECRETS_FILE").unwrap_or("/global.secrets".to_string());
     let global_secrets = std::fs::read_to_string(secrets_file)
@@ -113,28 +123,20 @@ fn main() {
         &private_key_to_public_key(&secrets.channels[&0].private_key),
     );
 
-    // this start address is pass the end of the address max size binary can load to from bootloader
-    // (0x10046000) there is an extra page in between just in case
-    // leave 8 pages after end, since we can have 8 pages of data
-    let flash_data_range_start = 0x10048000;
-    let flash_data_range_end = 0x1007c000 - 8 * 0x2000;
-    // the address where we store state that can change in flash at
-    // must be multiple of 128
-    let flash_data_addr = rand::thread_rng()
-        .gen_range((flash_data_range_start / 0x2000)..(flash_data_range_end / 0x2000))
-        * 0x2000;
-
-    rust_code.push_str(&format!(
-        "pub const FLASH_DATA_ADDR: usize = {flash_data_addr};\n"
-    ));
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    std::fs::write(out_path.join("ectf_params.rs"), rust_code).unwrap();
-
     // do compile time aslr
     // ASLR randomizes as following:
     //
     // Flash:
+    // Ectf bootloader only loads our program on a certain part of flash.
+    // Flash starts at 0x10000000, our binary is loaded at 0x1000e000
+    // Our binary can be up to 0x38000 bytes long, so it ends at 0x10046000, which is the 35th page of flash
+    // (meaning 36th page and on we are free to use for other data storage, such as subscription data)
+    // 
+    // There are 64 pages total, and there was some vulnerability with the last page last year,
+    // so we use for subscription data storage pages 37 to 62 inclusive
+    // (gap of one page after code, gap of one page on the other side before the vulnerable / info page).
+    // We pick 8 random pages from these pages to store subscription data on.
+    //
     // |--------------------------------------------------------------------------------|
     // | .vector_table: always 0x1000e000 (flash origin)                                |
     // |--------------------------------------------------------------------------------|
@@ -153,7 +155,7 @@ fn main() {
     //
     // RAM:
     // |--------------------------------------------------------------------------------|
-    // | .stack: top is stack_start, grows down                                         |
+    // | .stack: top of stack is at stack_start, grows down                             |
     // | (will have at least 1/4 ram size to grow down in ram)                          |
     // |                                                                                |
     // | stack_start: base of stack, randomly placed in middle half of flash            |
@@ -170,6 +172,9 @@ fn main() {
     // |--------------------------------------------------------------------------------|
     // | .bss                                                                           |
     // |--------------------------------------------------------------------------------|
+    const FLASH_START: usize = 0x10000000;
+    const FLASH_PAGE_SIZE: usize = 8192;
+
     let mut rng = rand::thread_rng();
 
     let flash_length = 0x00038000;
@@ -191,6 +196,22 @@ fn main() {
     // 0x2000 is 8KiB, still under 32 KiB margin of error
     let dataoffset = gen_addr(0, 0x2000, &mut rng);
     let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
+
+
+    // now determine which 8 pages to use for storing flash data
+    // possible pages are 37 to 62 inclusive as described above
+    let data_pages = 37..=62;
+    let used_data_pages = data_pages.choose_multiple(&mut rng, 8)
+        .iter()
+        .map(|page_number| FLASH_START + page_number * FLASH_PAGE_SIZE)
+        .collect::<Vec<_>>();
+
+    rust_code.push_str(&format!(
+        "pub const FLASH_DATA_ADDRS: [usize; 8] = {used_data_pages:?};\n",
+    ));
+
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    std::fs::write(out_path.join("ectf_params.rs"), rust_code).unwrap();
 
     let memory_x = format!("
         MEMORY {{

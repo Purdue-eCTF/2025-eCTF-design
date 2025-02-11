@@ -9,7 +9,7 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
-use crate::ectf_params::{FLASH_DATA_ADDR, MAX_SUBSCRIPTIONS};
+use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -171,14 +171,14 @@ impl DecoderContext {
         // safety: FLASH_PAGE_SIZE generated at build time is verified to be correct
         let subscriptions = unsafe {
             [
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 0),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 1),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 2),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 3),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 4),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 5),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 6),
-                FlashEntry::new(FLASH_DATA_ADDR + FLASH_PAGE_SIZE * 7),
+                FlashEntry::new(FLASH_DATA_ADDRS[0]),
+                FlashEntry::new(FLASH_DATA_ADDRS[1]),
+                FlashEntry::new(FLASH_DATA_ADDRS[2]),
+                FlashEntry::new(FLASH_DATA_ADDRS[3]),
+                FlashEntry::new(FLASH_DATA_ADDRS[4]),
+                FlashEntry::new(FLASH_DATA_ADDRS[5]),
+                FlashEntry::new(FLASH_DATA_ADDRS[6]),
+                FlashEntry::new(FLASH_DATA_ADDRS[7]),
             ]
         };
 

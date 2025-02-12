@@ -1,5 +1,5 @@
-use bytemuck::{must_cast_slice, Pod, Zeroable};
-use core::{marker::PhantomData, slice};
+use bytemuck::{bytes_of, Pod, Zeroable};
+use core::marker::PhantomData;
 use thiserror_no_std::Error;
 
 use max78000_hal::flash::FLASH_PAGE_SIZE;
@@ -51,7 +51,9 @@ impl<T: Pod> FlashEntry<T> {
         let ptr = self.status_address() as *const u32;
 
         // safety: address assumes to point to valid flash page, so this address is also on that page, and is a valid u32
-        unsafe { core::ptr::read(ptr) }
+        // I think this should be volatile, since underlying flash can change by writing to unrelated address
+        // so it kind of acts like io memory that will change without specific interaction from the compiler pov
+        unsafe { core::ptr::read_volatile(ptr) }
     }
 
     pub fn has_object(&self) -> bool {
@@ -71,7 +73,7 @@ impl<T: Pod> FlashEntry<T> {
         let flash = Flash::get();
 
         // convert object to bytes
-        let data = must_cast_slice(slice::from_ref(object));
+        let data = bytes_of(object);
 
         // 16 bytes for status at end
         assert!(data.len() < FLASH_PAGE_SIZE - 16);
@@ -168,7 +170,8 @@ impl DecoderContext {
 
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
 
-        // safety: FLASH_PAGE_SIZE generated at build time is verified to be correct
+        // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
+        // and made to not overlap with anything else
         let subscriptions = unsafe {
             [
                 FlashEntry::new(FLASH_DATA_ADDRS[0]),
@@ -189,7 +192,6 @@ impl DecoderContext {
         }
     }
 
-    #[allow(unused)]
     pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<&SubscriptionEntry> {
         self.subscriptions
             .iter()
@@ -197,7 +199,6 @@ impl DecoderContext {
             .find(|subscription| subscription.channel_id == channel_id)
     }
 
-    #[allow(unused)]
     pub fn update_subscription(
         &mut self,
         subscription: &SubscriptionEntry,

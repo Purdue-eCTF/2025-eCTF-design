@@ -1,6 +1,3 @@
-use core::cmp::Ordering;
-use core::time;
-
 use bytemuck::{try_from_bytes, Pod, Zeroable};
 use ed25519_dalek::VerifyingKey;
 
@@ -39,8 +36,6 @@ struct FrameData {
 pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<(), DecoderError> {
     let frame_info: FrameAssociatedData = *get_decoder_payload_associated_data(encoded_frame)?;
 
-    // println!("decode start: {frame_info:?}");
-
     // check frame we are decoding is monotonically increasing for security requirement 3
     if context
         .last_decoded_timestamp
@@ -52,8 +47,6 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     let (symmetric_key, public_key) =
         get_keys_for_channel(context, frame_info.channel_number, frame_info.timestamp)?;
 
-    // println!("generated keys: {symmetric_key:?}");
-
     // frame data has 1 byte at the start indicating how long it is
     // and 64 bytes after containing the data itself
     // this is to not leak length of frame (probably doesn't matter at all)
@@ -63,8 +56,6 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
         &symmetric_key,
         &public_key,
     )?;
-
-    // println!("decoded: {frame_data:?}");
 
     let frame_data: &FrameData = try_from_bytes(frame_data)?;
 
@@ -93,12 +84,10 @@ fn get_keys_for_channel(
             VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY).expect("Invalid public key bytes"),
         ))
     } else {
-        // println!("before get subscription");
         // other channel keys are derived from subscription data
         let Some(subscription) = context.get_subscription_for_channel(channel_number) else {
             return Err(DecoderError::InvalidSubscription);
         };
-        // println!("after get subscription");
 
         // this check is not necessary since deriving the key should fail,
         // but we do it just in case
@@ -110,13 +99,8 @@ fn get_keys_for_channel(
             return Err(DecoderError::InvalidTimestamp);
         }
 
-        // let trees = subscription.active_subtrees();
-        // println!("{trees:?}");
-
         // derive symmetric key based on subscription data and timestamp
         let symmetric_key = derive_decoder_key_for_timestamp(subscription, timestamp)?;
-
-        // println!("after derive");
 
         Ok((
             symmetric_key,

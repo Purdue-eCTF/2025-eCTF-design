@@ -2,8 +2,8 @@ use bytemuck::{bytes_of, Pod, Zeroable};
 use core::marker::PhantomData;
 use thiserror_no_std::Error;
 
-use max78000_hal::flash::FLASH_PAGE_SIZE;
-use max78000_hal::{flash::PAGE_MASK, Flash, Peripherals};
+use max78000_hal::{Flash, Peripherals};
+use max78000_hal::flash::{PAGE_MASK, FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE};
 
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
@@ -169,6 +169,14 @@ impl DecoderContext {
             Peripherals::take().expect("could not initialize peripherals");
 
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
+
+        // lock all flash pages not used for storing subscription data
+        for page_address in (FLASH_BASE_ADDR..(FLASH_BASE_ADDR + FLASH_SIZE))
+            .step_by(FLASH_PAGE_SIZE) {
+            if !FLASH_DATA_ADDRS.contains(&page_address) {
+                Flash::get().lock_page(page_address);
+            }
+        }
 
         // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
         // and made to not overlap with anything else

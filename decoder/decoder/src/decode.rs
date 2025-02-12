@@ -85,7 +85,7 @@ fn get_keys_for_channel(
         ))
     } else {
         // other channel keys are derived from subscription data
-        let Some(subscription) = context.get_subscription_for_channel(channel_number) else {
+        let Some((subscription, public_key)) = context.get_subscription_for_channel(channel_number) else {
             return Err(DecoderError::InvalidSubscription);
         };
 
@@ -104,7 +104,7 @@ fn get_keys_for_channel(
 
         Ok((
             symmetric_key,
-            VerifyingKey::from_bytes(&subscription.public_key).expect("Invalid public key bytes"),
+            public_key,
         ))
     }
 }
@@ -136,7 +136,9 @@ fn derive_decoder_key_for_timestamp(
     while lower != upper {
         let expanded_key = compute_chacha_block(key);
 
-        let lower_midsection = (lower + upper) / 2;
+        // can't do (upper + lower) / 2 because this could integer overflow
+        let region_size = upper - lower;
+        let lower_midsection = lower + (region_size >> 1);
         let upper_midsection = lower_midsection + 1;
 
         if timestamp <= lower_midsection {

@@ -1,4 +1,5 @@
 use bytemuck::{bytes_of, Pod, Zeroable};
+use ed25519_dalek::VerifyingKey;
 use core::marker::PhantomData;
 use thiserror_no_std::Error;
 
@@ -157,6 +158,11 @@ pub struct DecoderChannelInfo {
 pub struct DecoderContext {
     /// Data for all subscriptions
     subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
+    /// Cached public keys used for verifying signatures.
+    /// 
+    /// We cache these in memory instead of reconstructing from raw public key bytes
+    /// because that is a relatively slow process and we slightly miss decode timeing requirements.
+    public_keys: [Option<VerifyingKey>; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
     /// PRNG used for random operations to help prevent glitching
@@ -180,7 +186,7 @@ impl DecoderContext {
 
         // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
         // and made to not overlap with anything else
-        let subscriptions = unsafe {
+        let subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS] = unsafe {
             [
                 FlashEntry::new(FLASH_DATA_ADDRS[0]),
                 FlashEntry::new(FLASH_DATA_ADDRS[1]),
@@ -193,18 +199,30 @@ impl DecoderContext {
             ]
         };
 
+        let mut public_keys = [None; MAX_SUBSCRIPTIONS];
+        for (i, subscription_entry) in subscriptions.iter().enumerate() {
+            if let Some(subscription) = subscription_entry.get() {
+                public_keys[i] = Some(
+                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
+                );
+            }
+        }
+
         DecoderContext {
             subscriptions,
+            public_keys,
             last_decoded_timestamp: None,
             chacha,
         }
     }
 
-    pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<&SubscriptionEntry> {
+    pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<(&SubscriptionEntry, VerifyingKey)> {
         self.subscriptions
             .iter()
-            .filter_map(|flash_entry| flash_entry.get())
-            .find(|subscription| subscription.channel_id == channel_id)
+            .zip(self.public_keys)
+            .filter(|(flash_entry, public_key)| flash_entry.has_object() && public_key.is_some())
+            .map(|(flash_enty, pubic_key)| (flash_enty.get().unwrap(), pubic_key.unwrap()))
+            .find(|(subscription, _)| subscription.channel_id == channel_id)
     }
 
     pub fn update_subscription(
@@ -212,21 +230,29 @@ impl DecoderContext {
         subscription: &SubscriptionEntry,
     ) -> Result<(), DecoderContextError> {
         // update subscription if it already exists
-        for flash_entry in self.subscriptions.iter_mut() {
+        for (i, flash_entry) in self.subscriptions.iter_mut().enumerate() {
             let Some(subscription_old) = flash_entry.get() else {
                 continue;
             };
 
             if subscription_old.channel_id == subscription.channel_id {
                 flash_entry.set(subscription);
+                self.public_keys[i] = Some(
+                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
+                );
+
                 return Ok(());
             }
         }
 
         // find empty slot if no subcription for given channel exists
-        for flash_entry in self.subscriptions.iter_mut() {
+        for (i, flash_entry) in self.subscriptions.iter_mut().enumerate() {
             if !flash_entry.has_object() {
                 flash_entry.set(subscription);
+                self.public_keys[i] = Some(
+                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
+                );
+
                 return Ok(());
             }
         }

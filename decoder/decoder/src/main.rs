@@ -77,7 +77,7 @@ fn main() -> ! {
     loop {
         if let Ok(mut message) = Message::read() {
             let opcode = message.opcode;
-            println!("got message: {opcode:?}");
+            //println!("got message: {opcode:?}");
             let result = match message.opcode {
                 Opcode::List => list_channels(&mut context),
                 Opcode::Subscribe => subscribe::subscribe(&mut context, message.data_mut()),

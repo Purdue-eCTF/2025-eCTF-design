@@ -245,7 +245,7 @@ impl Flash {
         // calculate bit to set in register
         let flash_lock_bit = 1u32 << (page_number % 32);
 
-        if page_number >= 32 {
+        if page_number < 32 {
             // safety: any bit in welr0 register can be written to to lock a flash page
             self.regs
                 .welr0()

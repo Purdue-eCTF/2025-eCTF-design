@@ -18,15 +18,19 @@ pub struct Cursor<T> {
 #[derive(Debug, Error)]
 pub enum CursorError {
     #[error("Too many bytes: only {0} remaining")]
-    OversizeError(usize)
+    OversizeError(usize),
 }
+
+impl<T> Cursor<T> {
+    pub fn new(buf: T) -> Self {
+        Cursor { buf, offset: 0 }
+    }
+}
+
 impl<T> Cursor<T>
 where
     T: AsRef<[u8]>,
 {
-    pub fn new(buf: T) -> Self {
-        Cursor { buf, offset: 0 }
-    }
     /// Read bytes from this cursor into a buffer.
     /// If there is not enough bytes remaining to do so, return an error with how many bytes are left
     pub fn read_into(&mut self, other: &mut [u8]) -> Result<(), CursorError> {
@@ -38,6 +42,27 @@ where
             self.offset += other.len();
             Ok(())
         }
+    }
+}
+impl<T> Cursor<T>
+where
+    T: AsMut<[u8]>,
+{
+    /// Read bytes from this cursor into a buffer.
+    /// If there is not enough bytes remaining to do so, return an error with how many bytes are left
+    pub fn read_from(&mut self, other: &[u8]) -> Result<(), CursorError> {
+        let remainder = &mut self.buf.as_mut()[self.offset..];
+        if remainder.len() < other.len() {
+            Err(CursorError::OversizeError(remainder.len()))
+        } else {
+            let _ = &mut remainder[..other.len()].copy_from_slice(other);
+            self.offset += other.len();
+            Ok(())
+        }
+    }
+
+    pub fn written(&mut self) -> &mut [u8] {
+        &mut self.buf.as_mut()[..self.offset]
     }
 }
 
@@ -92,7 +117,7 @@ pub fn write_error<E: Display>(error: &E) -> Result<(), MessageError> {
     let mut message_buf = [0; MAX_BODY_SIZE];
     let mut writer = Cursor::new(&mut message_buf);
 
-    if write!(writer, "{}", error).is_ok() {
+    if write!(writer, "{error}").is_ok() {
         let error_len = writer.offset;
         write_error_bytes(&message_buf[..error_len])
     } else {
@@ -101,7 +126,7 @@ pub fn write_error<E: Display>(error: &E) -> Result<(), MessageError> {
 }
 
 /// Called internally by print and println macros.
-/// 
+///
 /// Prints formatted info as debug messages.
 pub fn write_debug_format(args: fmt::Arguments) {
     let mut message_buf = [0; MAX_BODY_SIZE];

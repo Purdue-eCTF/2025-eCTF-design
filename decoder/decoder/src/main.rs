@@ -12,7 +12,7 @@ use max78000_hal::timer::sleep;
 use max78000_hal::HalError;
 use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
-use utils::{write_error, CursorError};
+use utils::{write_error, Cursor, CursorError};
 
 mod crypto;
 mod decode;
@@ -52,16 +52,17 @@ pub enum DecoderError {
 
 fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {
     let channel_info = context.list_channels();
-    let channel_info_bytes = must_cast_slice(channel_info.as_slice());
 
     let mut data = [0; message::MAX_BODY_SIZE];
-
+    let mut data_cursor = Cursor::new(&mut data);
     // first 4 bytes is number of channels
-    data[0..4].copy_from_slice(&(channel_info.len() as u32).to_le_bytes());
-    // next bytes is info about channels
-    data[4..(4 + channel_info_bytes.len())].copy_from_slice(channel_info_bytes);
+    data_cursor.read_from(&(channel_info.len() as u32).to_le_bytes())?;
 
-    let response = Message::new(Opcode::List, (channel_info_bytes.len() + 4) as u16, data);
+    // next bytes is info about channels
+    data_cursor.read_from(must_cast_slice(channel_info.as_slice()))?;
+    let data = data_cursor.written();
+
+    let response = Message::from_data(Opcode::List, data);
     response.write()?;
 
     Ok(())
@@ -76,7 +77,7 @@ fn main() -> ! {
 
     loop {
         if let Ok(mut message) = Message::read() {
-            let opcode = message.opcode;
+            let _opcode = message.opcode;
             //println!("got message: {opcode:?}");
             let result = match message.opcode {
                 Opcode::List => list_channels(&mut context),

@@ -23,7 +23,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     // TODO (sebastian): verify the maximum number of subtrees
     assert!(subtree_count <= 128);
 
-    let mut subtrees = [Default::default(); 128];
+    let mut subtrees = [KeySubtree::default(); 128];
     for i in 0u32..subtree_count {
         let lowest_timestamp = read_value(&mut data_cursor)?;
         let highest_timestamp = read_value(&mut data_cursor)?;

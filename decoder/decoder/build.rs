@@ -1,8 +1,8 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use ed25519_dalek::{SecretKey, SigningKey, PUBLIC_KEY_LENGTH};
 use rand::rngs::ThreadRng;
-use rand::Rng;
 use rand::seq::IteratorRandom;
+use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -48,7 +48,7 @@ fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH]
 }
 
 /// Secrets keys in global secrets file.
-/// 
+///
 /// See python secret generation for details.
 #[derive(Debug, Deserialize)]
 struct GlobalSecrets {
@@ -58,7 +58,7 @@ struct GlobalSecrets {
 }
 
 /// Secrets for an individual channel.
-/// 
+///
 /// See python secret generation for details.
 #[derive(Debug, Deserialize)]
 struct ChannelSecrets {
@@ -131,7 +131,7 @@ fn main() {
     // Flash starts at 0x10000000, our binary is loaded at 0x1000e000
     // Our binary can be up to 0x38000 bytes long, so it ends at 0x10046000, which is the 35th page of flash
     // (meaning 36th page and on we are free to use for other data storage, such as subscription data)
-    // 
+    //
     // There are 64 pages total, and there was some vulnerability with the last page last year,
     // so we use for subscription data storage pages 37 to 62 inclusive
     // (gap of one page after code, gap of one page on the other side before the vulnerable / info page).
@@ -182,7 +182,10 @@ fn main() {
     let flash_origin = 0x1000e000;
     let ram_origin = 0x20000000;
 
-    let stack_start = ram_origin + (ram_length / 4) + gen_addr(0, ram_length / 2, &mut rng);
+    //  originally ram_length / 4 + gen_addr(ram_length / 2)
+    // key node cache is very big though so needed more stack space
+    // TODO: see if needed stack space can be reduced and this could be more randomized
+    let stack_start = ram_origin + (5 * ram_length / 8) + gen_addr(0, ram_length / 8, &mut rng);
 
     let sentry = 0x1000e200;
 
@@ -197,11 +200,11 @@ fn main() {
     let dataoffset = gen_addr(0, 0x2000, &mut rng);
     let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
 
-
     // now determine which 8 pages to use for storing flash data
     // possible pages are 37 to 62 inclusive as described above
     let data_pages = 37..=62;
-    let used_data_pages = data_pages.choose_multiple(&mut rng, 8)
+    let used_data_pages = data_pages
+        .choose_multiple(&mut rng, 8)
         .iter()
         .map(|page_number| FLASH_START + page_number * FLASH_PAGE_SIZE)
         .collect::<Vec<_>>();

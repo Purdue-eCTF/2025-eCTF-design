@@ -18,7 +18,7 @@ pub struct Cursor<T> {
 #[derive(Debug, Error)]
 pub enum CursorError {
     #[error("Too many bytes: only {0} remaining")]
-    OversizeError(usize)
+    OversizeError(usize),
 }
 impl<T> Cursor<T>
 where
@@ -101,7 +101,7 @@ pub fn write_error<E: Display>(error: &E) -> Result<(), MessageError> {
 }
 
 /// Called internally by print and println macros.
-/// 
+///
 /// Prints formatted info as debug messages.
 pub fn write_debug_format(args: fmt::Arguments) {
     let mut message_buf = [0; MAX_BODY_SIZE];

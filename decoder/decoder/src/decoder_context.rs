@@ -1,10 +1,10 @@
 use bytemuck::{bytes_of, Pod, Zeroable};
-use ed25519_dalek::VerifyingKey;
 use core::marker::PhantomData;
+use ed25519_dalek::VerifyingKey;
 use thiserror_no_std::Error;
 
+use max78000_hal::flash::{FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE, PAGE_MASK};
 use max78000_hal::{Flash, Peripherals};
-use max78000_hal::flash::{PAGE_MASK, FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE};
 
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
@@ -139,6 +139,38 @@ pub struct KeySubtree {
     pub key: [u8; 32],
 }
 
+impl KeySubtree {
+    pub fn contains(&self, timestamp: u64) -> bool {
+        self.lowest_timestamp <= timestamp && timestamp <= self.highest_timestamp
+    }
+}
+
+/// Caches certain information about channel keys to speed up the decoding process.
+///
+/// Necessary because otherwise we miss the decode speed target.
+#[derive(Debug, Clone, Copy)]
+pub struct ChannelCache {
+    /// Parsed public key used to verify frames
+    pub public_key: VerifyingKey,
+    /// Caches the last used key for each level in the channel key tree.
+    ///
+    /// Timestamps close together will likely share most of the same keys,
+    /// so the cache can be used instead of recomputing keys.
+    ///
+    /// The first index in the cache is the biggest entry, and so on until the leaf.
+    pub cache_entries: ArrayVec<[KeySubtree; 64]>,
+}
+
+impl ChannelCache {
+    fn new(public_key: &[u8; 32]) -> Self {
+        ChannelCache {
+            public_key: VerifyingKey::from_bytes(public_key)
+                .expect("Failed to construct verifying key"),
+            cache_entries: ArrayVec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum DecoderContextError {
     #[error("Too many subscriptions!")]
@@ -157,12 +189,7 @@ pub struct DecoderChannelInfo {
 /// Stores state of decoder.
 pub struct DecoderContext {
     /// Data for all subscriptions
-    subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
-    /// Cached public keys used for verifying signatures.
-    /// 
-    /// We cache these in memory instead of reconstructing from raw public key bytes
-    /// because that is a relatively slow process and we slightly miss decode timeing requirements.
-    public_keys: [Option<VerifyingKey>; MAX_SUBSCRIPTIONS],
+    subscriptions: [(FlashEntry<SubscriptionEntry>, Option<ChannelCache>); MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
     /// PRNG used for random operations to help prevent glitching
@@ -177,8 +204,9 @@ impl DecoderContext {
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
 
         // lock all flash pages not used for storing subscription data
-        for page_address in (FLASH_BASE_ADDR..(FLASH_BASE_ADDR + FLASH_SIZE))
-            .step_by(FLASH_PAGE_SIZE) {
+        for page_address in
+            (FLASH_BASE_ADDR..(FLASH_BASE_ADDR + FLASH_SIZE)).step_by(FLASH_PAGE_SIZE)
+        {
             if !FLASH_DATA_ADDRS.contains(&page_address) {
                 Flash::get().lock_page(page_address);
             }
@@ -186,42 +214,42 @@ impl DecoderContext {
 
         // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
         // and made to not overlap with anything else
-        let subscriptions: [FlashEntry<SubscriptionEntry>; MAX_SUBSCRIPTIONS] = unsafe {
+        let mut subscriptions: [(FlashEntry<SubscriptionEntry>, Option<ChannelCache>);
+            MAX_SUBSCRIPTIONS] = unsafe {
             [
-                FlashEntry::new(FLASH_DATA_ADDRS[0]),
-                FlashEntry::new(FLASH_DATA_ADDRS[1]),
-                FlashEntry::new(FLASH_DATA_ADDRS[2]),
-                FlashEntry::new(FLASH_DATA_ADDRS[3]),
-                FlashEntry::new(FLASH_DATA_ADDRS[4]),
-                FlashEntry::new(FLASH_DATA_ADDRS[5]),
-                FlashEntry::new(FLASH_DATA_ADDRS[6]),
-                FlashEntry::new(FLASH_DATA_ADDRS[7]),
+                (FlashEntry::new(FLASH_DATA_ADDRS[0]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[1]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[2]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[3]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[4]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[5]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[6]), None),
+                (FlashEntry::new(FLASH_DATA_ADDRS[7]), None),
             ]
         };
 
-        let mut public_keys = [None; MAX_SUBSCRIPTIONS];
-        for (i, subscription_entry) in subscriptions.iter().enumerate() {
+        // recreate cache information
+        for (subscription_entry, cache) in subscriptions.iter_mut() {
             if let Some(subscription) = subscription_entry.get() {
-                public_keys[i] = Some(
-                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
-                );
+                *cache = Some(ChannelCache::new(&subscription.public_key));
             }
         }
 
         DecoderContext {
             subscriptions,
-            public_keys,
             last_decoded_timestamp: None,
             chacha,
         }
     }
 
-    pub fn get_subscription_for_channel(&self, channel_id: u32) -> Option<(&SubscriptionEntry, VerifyingKey)> {
+    pub fn get_subscription_for_channel(
+        &mut self,
+        channel_id: u32,
+    ) -> Option<(&SubscriptionEntry, &mut ChannelCache)> {
         self.subscriptions
-            .iter()
-            .zip(self.public_keys)
-            .filter(|(flash_entry, public_key)| flash_entry.has_object() && public_key.is_some())
-            .map(|(flash_enty, pubic_key)| (flash_enty.get().unwrap(), pubic_key.unwrap()))
+            .iter_mut()
+            .filter(|(flash_entry, cache)| flash_entry.has_object() && cache.is_some())
+            .map(|(flash_enty, cache)| (flash_enty.get().unwrap(), cache.as_mut().unwrap()))
             .find(|(subscription, _)| subscription.channel_id == channel_id)
     }
 
@@ -230,28 +258,24 @@ impl DecoderContext {
         subscription: &SubscriptionEntry,
     ) -> Result<(), DecoderContextError> {
         // update subscription if it already exists
-        for (i, flash_entry) in self.subscriptions.iter_mut().enumerate() {
+        for (flash_entry, cache) in self.subscriptions.iter_mut() {
             let Some(subscription_old) = flash_entry.get() else {
                 continue;
             };
 
             if subscription_old.channel_id == subscription.channel_id {
                 flash_entry.set(subscription);
-                self.public_keys[i] = Some(
-                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
-                );
+                *cache = Some(ChannelCache::new(&subscription.public_key));
 
                 return Ok(());
             }
         }
 
         // find empty slot if no subcription for given channel exists
-        for (i, flash_entry) in self.subscriptions.iter_mut().enumerate() {
+        for (flash_entry, cache) in self.subscriptions.iter_mut() {
             if !flash_entry.has_object() {
                 flash_entry.set(subscription);
-                self.public_keys[i] = Some(
-                    VerifyingKey::from_bytes(&subscription.public_key).expect("invalid public key for subscription")
-                );
+                *cache = Some(ChannelCache::new(&subscription.public_key));
 
                 return Ok(());
             }
@@ -266,7 +290,7 @@ impl DecoderContext {
     pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfo; MAX_SUBSCRIPTIONS]> {
         let mut out = ArrayVec::new();
 
-        for flash_entry in self.subscriptions.iter() {
+        for (flash_entry, _) in self.subscriptions.iter() {
             if let Some(subscription) = flash_entry.get() {
                 out.push(DecoderChannelInfo {
                     channel_id: subscription.channel_id,

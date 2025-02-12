@@ -4,7 +4,7 @@ use ed25519_dalek::VerifyingKey;
 use crate::crypto::{
     compute_chacha_block, decrypt_decoder_payload, get_decoder_payload_associated_data,
 };
-use crate::decoder_context::SubscriptionEntry;
+use crate::decoder_context::{ChannelCache, KeySubtree, SubscriptionEntry};
 use crate::ectf_params::{CHANNEL0_ENC_KEY, CHANNEL0_PUBLIC_KEY};
 use crate::message::{Message, Opcode};
 use crate::println;
@@ -73,7 +73,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
 
 /// Retrieve the public and symmetric keys for a frame on channel `channel_number` encoded with timestamp `timestamp`.
 fn get_keys_for_channel(
-    context: &DecoderContext,
+    context: &mut DecoderContext,
     channel_number: u32,
     timestamp: u64,
 ) -> Result<([u8; 32], VerifyingKey), DecoderError> {
@@ -85,7 +85,8 @@ fn get_keys_for_channel(
         ))
     } else {
         // other channel keys are derived from subscription data
-        let Some((subscription, public_key)) = context.get_subscription_for_channel(channel_number) else {
+        let Some((subscription, cache)) = context.get_subscription_for_channel(channel_number)
+        else {
             return Err(DecoderError::InvalidSubscription);
         };
 
@@ -100,12 +101,9 @@ fn get_keys_for_channel(
         }
 
         // derive symmetric key based on subscription data and timestamp
-        let symmetric_key = derive_decoder_key_for_timestamp(subscription, timestamp)?;
+        let symmetric_key = derive_decoder_key_for_timestamp(subscription, cache, timestamp)?;
 
-        Ok((
-            symmetric_key,
-            public_key,
-        ))
+        Ok((symmetric_key, cache.public_key))
     }
 }
 
@@ -114,41 +112,65 @@ fn get_keys_for_channel(
 /// This uses the GGM key tree discussed in design doc.
 fn derive_decoder_key_for_timestamp(
     subscription: &SubscriptionEntry,
+    cache: &mut ChannelCache,
     timestamp: u64,
 ) -> Result<[u8; 32], DecoderError> {
-    // locate subtree root containing the key for the timestamp we are interested in
-    let subtree = subscription
-        .active_subtrees()
-        .iter()
-        .find(|tree| tree.lowest_timestamp <= timestamp && timestamp <= tree.highest_timestamp)
-        .ok_or_else(|| {
-            println!("Failed to find correct subtree");
-            println!("{:?}", subscription.active_subtrees());
-            DecoderError::NoTimestampFound
-        })?;
-    assert!(subtree.lowest_timestamp <= timestamp && timestamp <= subtree.highest_timestamp);
+    // check if the cache ontains information for the timestamp
+    let mut subtree = if cache.cache_entries.len() > 0 && cache.cache_entries[0].contains(timestamp)
+    {
+        // search from low end of cache for first match
+        let (i, subtree) = cache
+            .cache_entries
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, subtree)| subtree.contains(timestamp))
+            // already checked cache contains subtree not possible for it to return none
+            .unwrap();
 
-    let mut lower = subtree.lowest_timestamp;
-    let mut upper = subtree.highest_timestamp;
+        // make burrow checker happy
+        let subtree = *subtree;
 
-    let mut key = subtree.key;
+        // clear everything after match since they will be overwritten
+        cache.cache_entries.resize(i + 1, KeySubtree::default());
+
+        subtree
+    } else {
+        // otherwise locate subtree root containing the key for the timestamp we are interested in
+        // from the subscription data stored in flash
+        *subscription
+            .active_subtrees()
+            .iter()
+            .find(|tree| tree.contains(timestamp))
+            .ok_or_else(|| {
+                println!("Failed to find correct subtree");
+                println!("{:?}", subscription.active_subtrees());
+                DecoderError::NoTimestampFound
+            })?
+    };
+
+    assert!(subtree.contains(timestamp));
+
     // shrink upper and lower bounds until we have found the key
-    while lower != upper {
-        let expanded_key = compute_chacha_block(key);
+    while subtree.lowest_timestamp != subtree.highest_timestamp {
+        let expanded_key = compute_chacha_block(subtree.key);
 
         // can't do (upper + lower) / 2 because this could integer overflow
-        let region_size = upper - lower;
-        let lower_midsection = lower + (region_size >> 1);
+        let region_size = subtree.highest_timestamp - subtree.lowest_timestamp;
+        let lower_midsection = subtree.lowest_timestamp + (region_size >> 1);
         let upper_midsection = lower_midsection + 1;
 
         if timestamp <= lower_midsection {
-            key.copy_from_slice(&expanded_key[..32]);
-            upper = lower_midsection;
+            subtree.key.copy_from_slice(&expanded_key[..32]);
+            subtree.highest_timestamp = lower_midsection;
         } else {
-            key.copy_from_slice(&expanded_key[32..]);
-            lower = upper_midsection;
+            subtree.key.copy_from_slice(&expanded_key[32..]);
+            subtree.lowest_timestamp = upper_midsection;
         }
+
+        // add the new subtree into the cache
+        cache.cache_entries.push(subtree);
     }
 
-    Ok(key)
+    Ok(subtree.key)
 }

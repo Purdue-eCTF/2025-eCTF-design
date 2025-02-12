@@ -290,7 +290,7 @@ impl DecoderContext {
     pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfo; MAX_SUBSCRIPTIONS]> {
         let mut out = ArrayVec::new();
 
-        for (flash_entry, _) in self.subscriptions.iter() {
+        for (flash_entry, _) in &self.subscriptions {
             if let Some(subscription) = flash_entry.get() {
                 out.push(DecoderChannelInfo {
                     channel_id: subscription.channel_id,

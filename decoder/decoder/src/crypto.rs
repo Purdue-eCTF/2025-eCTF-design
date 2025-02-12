@@ -45,13 +45,12 @@ pub fn decrypt_decoder_payload<'a>(
     let header: DecoderPayloadHeader = *from_bytes(&payload[..size_of::<DecoderPayloadHeader>()]);
 
     // first verify signature
-    // signaute should include chacha nonce and tag, otherwise attacker can alter nonce and get invalid frame
+    // signature should include chacha nonce and tag, otherwise attacker can alter nonce and get invalid frame
     // decode for scenario 5 if they have the key
     let message_to_verify = &payload[SIGNATURE_LENGTH..];
-    let Ok(_) = public_key.verify(message_to_verify, &Signature::from_bytes(&header.signature))
-    else {
-        return Err(DecoderError::InvalidEncoderPayload);
-    };
+    public_key
+        .verify(message_to_verify, &Signature::from_bytes(&header.signature))
+        .map_err(|_| DecoderError::InvalidEncoderPayload)?;
 
     // retrieve ciphertext and associated data
     let body = &mut payload[size_of::<DecoderPayloadHeader>()..];
@@ -59,14 +58,14 @@ pub fn decrypt_decoder_payload<'a>(
 
     // then decrypt message
     let cipher = XChaCha20Poly1305::new(symmetric_key.into());
-    let Ok(_) = cipher.decrypt_in_place_detached(
-        &header.chacha_nonce.into(),
-        associated_data,
-        ciphertext,
-        &header.poly1305_tag.into(),
-    ) else {
-        return Err(DecoderError::InvalidEncoderPayload);
-    };
+    cipher
+        .decrypt_in_place_detached(
+            &header.chacha_nonce.into(),
+            associated_data,
+            ciphertext,
+            &header.poly1305_tag.into(),
+        )
+        .map_err(|_| DecoderError::InvalidEncoderPayload)?;
 
     Ok(ciphertext)
 }

@@ -101,14 +101,12 @@ fn main() {
     // generate rust code with necessary constants
     let mut rust_code = String::new();
 
-    rust_code.push_str(&format!("pub const DECODER_ID: u32 = {};\n", decoder_id));
+    rust_code.push_str(&format!("pub const DECODER_ID: u32 = {decoder_id};\n"));
 
     let mut add_bytes = |name, data: &[u8]| {
         rust_code.push_str(&format!(
-            "pub const {}: [u8; {}] = {:?};\n",
-            name,
-            data.len(),
-            data
+            "pub const {name}: [u8; {}] = {data:?};\n",
+            data.len()
         ));
     };
 

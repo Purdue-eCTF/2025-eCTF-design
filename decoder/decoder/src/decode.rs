@@ -137,7 +137,7 @@ fn derive_decoder_key_for_timestamp(
         subtree
     } else {
         // clear cache since whole cache will be invalidated
-        cache.cache_entries.clear();;
+        cache.cache_entries.clear();
 
         // otherwise locate subtree root containing the key for the timestamp we are interested in
         // from the subscription data stored in flash

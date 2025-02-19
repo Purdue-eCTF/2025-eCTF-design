@@ -19,14 +19,29 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let channel_id: u32 = read_value(&mut data_cursor)?;
     assert!(channel_id <= 8);
 
-    let subtree_count: u32 = read_value(&mut data_cursor)?;
-    // TODO (sebastian): verify the maximum number of subtrees
+    let subtree_count: u8 = read_value(&mut data_cursor)?;
     assert!(subtree_count <= 128);
 
     let mut subtrees = [KeySubtree::default(); 128];
-    for i in 0u32..subtree_count {
-        let lowest_timestamp = read_value(&mut data_cursor)?;
-        let highest_timestamp = read_value(&mut data_cursor)?;
+
+    /*
+    Start and end timestamp have already been sent. Since the nodes must be a continuous range,
+    we can omit sending highest_timestamp, as well as the lowest_timestamp for the first node.
+    This saves serial bandwidth, which seems to be taking too long.
+    */
+
+    let mut lowest_timestamps = [0u64; 128];
+    lowest_timestamps[0] = start_time;
+    data_cursor.read_into(bytemuck::cast_slice_mut(
+        &mut lowest_timestamps[1..subtree_count as usize],
+    ))?;
+    for i in 0..subtree_count {
+        let lowest_timestamp = lowest_timestamps[i as usize];
+        let highest_timestamp = if i == subtree_count - 1 {
+            end_time
+        } else {
+            lowest_timestamps[(i + 1) as usize] - 1
+        };
         assert!(lowest_timestamp <= highest_timestamp);
 
         let key = read_value(&mut data_cursor)?;
@@ -44,13 +59,18 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
         channel_id,
         public_key: channel_public_key,
         subtrees,
-        subtree_count,
+        subtree_count: subtree_count as u32,
     };
 
-    // make sure subtrees are sorted by lowest timestamp
-    assert!(subscription
-        .active_subtrees()
-        .is_sorted_by_key(|subtree| subtree.lowest_timestamp));
+    // make sure the whole valid range is covered
+    let active = subscription.active_subtrees();
+    assert!(active[0].lowest_timestamp == start_time);
+    assert!(active.last().unwrap().highest_timestamp == end_time);
+    assert!(active[..active.len() - 1]
+        .iter()
+        .zip(active[1..].iter())
+        .all(|(lower, higher)| lower.highest_timestamp == higher.lowest_timestamp - 1));
+
     Ok(subscription)
 }
 

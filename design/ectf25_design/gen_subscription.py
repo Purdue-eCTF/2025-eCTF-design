@@ -61,17 +61,18 @@ def gen_subscription(
     assert key_nodes[0].lowest_timestamp == start
     assert highest == end
 
-    # make sure that we don't have too many nodes
+    # if length < 256, it can be packed into a byte
+    # 126 should be the worst case
     assert len(key_nodes) <= 128
     assert all(len(node.key) == 32 for node in key_nodes)
 
+    # since nodes are continuous and sorted by range,
+    # we only need to send the start timestamp to get the end
     data = (
         public_key
-        + struct.pack("<QQII", start, end, channel, len(key_nodes))
-        + b"".join([
-            struct.pack("<QQ", node.lowest_timestamp, node.highest_timestamp) + node.key
-            for node in key_nodes
-        ])
+        + struct.pack("<QQIB", start, end, channel, len(key_nodes))
+        + b"".join([struct.pack("<Q", node.lowest_timestamp) for node in key_nodes[1:]])
+        + b"".join([node.key for node in key_nodes])
     )
 
     print(f"{len(data) = }")

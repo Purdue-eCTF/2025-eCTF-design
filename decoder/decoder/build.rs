@@ -183,7 +183,7 @@ fn main() {
     //  originally ram_length / 4 + gen_addr(ram_length / 2)
     // key node cache is very big though so needed more stack space
     // TODO: see if needed stack space can be reduced and this could be more randomized
-    let stack_start = ram_origin + (5 * ram_length / 8) + gen_addr(0, ram_length / 8, &mut rng);
+    let stack_start = ram_origin + (3 * ram_length / 4) + gen_addr(0, ram_length / 8, &mut rng);
 
     let sentry = 0x1000e200;
 
@@ -196,7 +196,7 @@ fn main() {
     // don't want to waste too much space on that, since stack_start randomization already affects data placements
     // 0x2000 is 8KiB, still under 32 KiB margin of error
     let dataoffset = gen_addr(0, 0x2000, &mut rng);
-    let bssoffset = gen_addr(0, ram_length / 8, &mut rng);
+    let bssoffset = gen_addr(0, ram_length / 16, &mut rng);
 
     // now determine which 8 pages to use for storing flash data
     // possible pages are 37 to 62 inclusive as described above

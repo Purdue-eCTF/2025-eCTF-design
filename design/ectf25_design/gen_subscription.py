@@ -64,19 +64,19 @@ def gen_subscription(
     # if length < 256, it can be packed into a byte
     # 126 should be the worst case
     assert len(key_nodes) <= 128
+    logger.debug(f"Generated {len(key_nodes)} nodes")
     assert all(len(node.key) == 32 for node in key_nodes)
 
     # since nodes are continuous and sorted by range,
-    # we only need to send the start timestamp to get the end
+    # we only need to send the depth of each node
     data = (
         public_key
         + struct.pack("<QQIB", start, end, channel, len(key_nodes))
-        + b"".join([struct.pack("<Q", node.lowest_timestamp) for node in key_nodes[1:]])
-        + b"".join([node.key for node in key_nodes])
+        + b"".join([struct.pack("<B", node.depth()) + node.key for node in key_nodes])
     )
 
-    print(f"{len(data) = }")
-    logger.debug(f"data before encryption: {data}")
+    logger.debug(f"Total length = {len(data)}")
+    logger.debug(f"Data before encryption: {data}")
     return encrypt_payload(
         data, b"", subscription_symmetric_key, secrets.subscribe_signing_key()
     )

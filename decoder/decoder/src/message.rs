@@ -79,8 +79,8 @@ impl Opcode {
 }
 
 pub const MAGIC: u8 = b'%';
-// 7 KiB
-pub const MAX_BODY_SIZE: usize = 7168;
+// 5 KiB
+pub const MAX_BODY_SIZE: usize = 5120;
 const CHUNK_SIZE: usize = 256;
 const NACKS: [Opcode; 2] = [Opcode::Debug, Opcode::Ack];
 

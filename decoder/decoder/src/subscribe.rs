@@ -4,6 +4,7 @@ use ed25519_dalek::VerifyingKey;
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
 use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, SUBSCRIPTION_PUBLIC_KEY};
 use crate::message::{Message, Opcode};
+use crate::println;
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
@@ -26,23 +27,16 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
 
     /*
     Start and end timestamp have already been sent. Since the nodes must be a continuous range,
-    we can omit sending highest_timestamp, as well as the lowest_timestamp for the first node.
-    This saves serial bandwidth, which seems to be taking too long.
+    we can only send the depth, which encodes the range between the start and end of the current node.
+    This saves serial bandwidth, which was taking too long.
     */
-
-    let mut lowest_timestamps = [0u64; 128];
-    lowest_timestamps[0] = start_time;
-    data_cursor.read_into(bytemuck::cast_slice_mut(
-        &mut lowest_timestamps[1..subtree_count as usize],
-    ))?;
+    let mut current_timestamp = start_time;
     for i in 0..subtree_count {
-        let lowest_timestamp = lowest_timestamps[i as usize];
-        let highest_timestamp = if i == subtree_count - 1 {
-            end_time
-        } else {
-            lowest_timestamps[(i + 1) as usize] - 1
-        };
+        let lowest_timestamp = current_timestamp;
+        let depth: u8 = read_value(&mut data_cursor)?;
+        let highest_timestamp = lowest_timestamp + (1 << (64 - depth)) - 1;
         assert!(lowest_timestamp <= highest_timestamp);
+        current_timestamp = highest_timestamp + 1;
 
         let key = read_value(&mut data_cursor)?;
         let subtree = KeySubtree {
@@ -64,6 +58,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
 
     // make sure the whole valid range is covered
     let active = subscription.active_subtrees();
+    // println!("{:?}", active);
     assert!(active[0].lowest_timestamp == start_time);
     assert!(active.last().unwrap().highest_timestamp == end_time);
     assert!(active[..active.len() - 1]

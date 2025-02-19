@@ -4,7 +4,6 @@ use ed25519_dalek::VerifyingKey;
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
 use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, SUBSCRIPTION_PUBLIC_KEY};
 use crate::message::{Message, Opcode};
-use crate::println;
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
@@ -21,6 +20,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     assert!(channel_id <= 8);
 
     let subtree_count: u8 = read_value(&mut data_cursor)?;
+    let subtree_count = u32::from(subtree_count);
     assert!(subtree_count <= 128);
 
     let mut subtrees = [KeySubtree::default(); 128];
@@ -53,12 +53,11 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
         channel_id,
         public_key: channel_public_key,
         subtrees,
-        subtree_count: subtree_count as u32,
+        subtree_count,
     };
 
     // make sure the whole valid range is covered
     let active = subscription.active_subtrees();
-    // println!("{:?}", active);
     assert!(active[0].lowest_timestamp == start_time);
     assert!(active.last().unwrap().highest_timestamp == end_time);
     assert!(active[..active.len() - 1]

@@ -77,7 +77,7 @@ fn main() -> ! {
 
     loop {
         if let Ok(mut message) = Message::read() {
-            let _opcode = message.opcode;
+            let opcode = message.opcode;
             //println!("got message: {opcode:?}");
             let result = match message.opcode {
                 Opcode::List => list_channels(&mut context),

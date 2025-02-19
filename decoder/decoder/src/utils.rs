@@ -55,7 +55,7 @@ where
         if remainder.len() < other.len() {
             Err(CursorError::OversizeError(remainder.len()))
         } else {
-            let _ = &mut remainder[..other.len()].copy_from_slice(other);
+            let () = &mut remainder[..other.len()].copy_from_slice(other);
             self.offset += other.len();
             Ok(())
         }

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Self
+from typing import Self
 
 from .util import compute_chacha_block, verify_timestamp
 
@@ -23,6 +23,9 @@ class KeyNode:
         new_lowest = (self.lowest_timestamp + self.highest_timestamp + 1) // 2
         self.right = KeyNode(rightcha, new_lowest, self.highest_timestamp)
         return self.right
+
+    def depth(self):
+        return 64 - (self.highest_timestamp - self.lowest_timestamp).bit_count()
 
 
 def generate_tree(

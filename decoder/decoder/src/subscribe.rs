@@ -1,8 +1,7 @@
 use bytemuck::{AnyBitPattern, NoUninit};
-use ed25519_dalek::VerifyingKey;
 
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
-use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, SUBSCRIPTION_PUBLIC_KEY};
+use crate::ectf_params::SUBSCRIPTION_ENC_KEY;
 use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
@@ -72,14 +71,13 @@ pub fn subscribe(
     context: &mut DecoderContext,
     subscribe_data: &mut [u8],
 ) -> Result<(), DecoderError> {
-    let subscription_public_key = VerifyingKey::from_bytes(&SUBSCRIPTION_PUBLIC_KEY)
-        .expect("decoder loaded with invalid public key");
+    let subscription_public_key = &context.subscription_public_key;
 
     let subscription_data = decrypt_decoder_payload(
         subscribe_data,
         0,
         &SUBSCRIPTION_ENC_KEY,
-        &subscription_public_key,
+        subscription_public_key,
     )?;
     let entry = read_subscription(subscription_data)?;
     context.update_subscription(&entry)?;

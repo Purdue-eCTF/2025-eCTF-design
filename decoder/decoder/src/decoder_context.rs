@@ -10,7 +10,7 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
-use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS};
+use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -194,6 +194,8 @@ pub struct DecoderContext {
     pub last_decoded_timestamp: Option<u64>,
     /// PRNG used for random operations to help prevent glitching
     chacha: ChaCha20Rng,
+    /// Verifying public key for subscriptions
+    pub subscription_public_key: VerifyingKey,
 }
 
 impl DecoderContext {
@@ -235,10 +237,13 @@ impl DecoderContext {
             }
         }
 
+        let subscription_public_key = VerifyingKey::from_bytes(&SUBSCRIPTION_PUBLIC_KEY)
+            .expect("decoder loaded with invalid public key");
         DecoderContext {
             subscriptions,
             last_decoded_timestamp: None,
             chacha,
+            subscription_public_key,
         }
     }
 

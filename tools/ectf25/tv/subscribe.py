@@ -41,7 +41,11 @@ def main():
     decoder = DecoderIntf(args.port)
 
     # Run subscribe command
+    import time
+    start = time.perf_counter()
     decoder.subscribe(subscription)
+    end = time.perf_counter()
+    print(f"time: {end - start:.3f} seconds")
 
     logger.success("Subscribe successful")
 

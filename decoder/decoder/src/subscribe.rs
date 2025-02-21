@@ -1,7 +1,8 @@
 use bytemuck::{AnyBitPattern, NoUninit};
 
+use crate::crypto::get_decoder_payload_associated_data;
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
-use crate::ectf_params::SUBSCRIPTION_ENC_KEY;
+use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, DECODER_ID};
 use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
@@ -67,15 +68,30 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     Ok(subscription)
 }
 
+/// Non encrypted associated data sent with subscription.
+///
+/// Probably not needed but signing plaintext decoder id ensures only 1 possible symmetric
+/// key can be used to decrypt payload, just in case.
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+struct SubscriptionAssociatedData {
+    decoder_id: u32,
+}
+
 pub fn subscribe(
     context: &mut DecoderContext,
     subscribe_data: &mut [u8],
 ) -> Result<(), DecoderError> {
+    let associated_data = *get_decoder_payload_associated_data(subscribe_data)?;
+    if associated_data.decoder_id != DECODER_ID {
+        return Err(DecoderError::InvalidSubscription);
+    }
+
     let subscription_public_key = &context.subscription_public_key;
 
     let subscription_data = decrypt_decoder_payload(
         subscribe_data,
-        0,
+        size_of::<SubscriptionAssociatedData>(),
         &SUBSCRIPTION_ENC_KEY,
         subscription_public_key,
     )?;

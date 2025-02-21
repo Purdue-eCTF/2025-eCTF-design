@@ -78,7 +78,10 @@ def gen_subscription(
     logger.debug(f"Total length = {len(data)}")
     logger.debug(f"Data before encryption: {data}")
     return encrypt_payload(
-        data, b"", subscription_symmetric_key, secrets.subscribe_signing_key()
+        data,
+        struct.pack("<I", device_id),
+        subscription_symmetric_key,
+        secrets.subscribe_signing_key(),
     )
 
 

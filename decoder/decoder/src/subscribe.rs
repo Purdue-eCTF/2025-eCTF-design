@@ -1,4 +1,4 @@
-use bytemuck::{AnyBitPattern, NoUninit};
+use bytemuck::{AnyBitPattern, NoUninit, Pod, Zeroable};
 
 use crate::crypto::get_decoder_payload_associated_data;
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
@@ -82,7 +82,7 @@ pub fn subscribe(
     context: &mut DecoderContext,
     subscribe_data: &mut [u8],
 ) -> Result<(), DecoderError> {
-    let associated_data = *get_decoder_payload_associated_data(subscribe_data)?;
+    let associated_data: SubscriptionAssociatedData = *get_decoder_payload_associated_data(subscribe_data)?;
     if associated_data.decoder_id != DECODER_ID {
         return Err(DecoderError::InvalidSubscription);
     }

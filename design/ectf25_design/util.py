@@ -9,6 +9,7 @@ from Crypto.Cipher import ChaCha20, ChaCha20_Poly1305
 from Crypto.Random import get_random_bytes
 from Crypto.Signature import eddsa
 
+EMERGENCY_CHANNEL_INTERNAL_ID = 8
 
 def random(n: int) -> bytes:
     """Generates `n` cryptographically secure random bytes."""
@@ -40,6 +41,10 @@ def verify_decoder(decoder_id: int):
 class ChannelKey:
     """Keys used for a specific channel."""
 
+    # Id of channel used internally, it is just 1 byte
+    # Goes from 0-7 for regular channels, 8 for emergency channel
+    internal_id: int
+
     # root of key tree used for generating encryption keys.
     # For channel 0 there is no key tree, this is just encryption key itself.
     root_key: bytes
@@ -57,8 +62,9 @@ class ChannelKey:
         return raw
 
     @classmethod
-    def generate(cls) -> Self:
+    def generate(cls, id) -> Self:
         return cls(
+            internal_id=id,
             root_key=random(32),
             private_key=random(32),
         )
@@ -104,12 +110,14 @@ class GlobalSecrets:
 
     @classmethod
     def generate(cls, channel_ids: list[int]) -> Self:
+        assert len(channel_ids) <= 8, "Too many channel when generating global secrets"
+
         channels = {}
         # channel 0 always exists
-        channels[0] = ChannelKey.generate()
+        channels[0] = ChannelKey.generate(EMERGENCY_CHANNEL_INTERNAL_ID)
 
-        for channel_id in channel_ids:
-            channels[channel_id] = ChannelKey.generate()
+        for i, channel_id in enumerate(channel_ids):
+            channels[channel_id] = ChannelKey.generate(i)
 
         return cls(
             subscribe_root_key=random(32),
@@ -123,6 +131,7 @@ class GlobalSecrets:
             "subscribe_private_key": list(self.subscribe_private_key),
             "channels": {
                 channel_id: {
+                    "internal_id": channel.internal_id,
                     "root_key": list(channel.root_key),
                     "private_key": list(channel.private_key),
                 }
@@ -139,6 +148,7 @@ class GlobalSecrets:
             subscribe_private_key=bytes(data["subscribe_private_key"]),
             channels={
                 int(channel_id): ChannelKey(
+                    internal_id=channel_json["internal_id"],
                     root_key=bytes(channel_json["root_key"]),
                     private_key=bytes(channel_json["private_key"]),
                 )

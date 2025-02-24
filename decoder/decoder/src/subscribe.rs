@@ -7,17 +7,15 @@ use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
-fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
+fn read_subscription(data: &[u8]) -> Result<(u8, SubscriptionEntry), DecoderError> {
     let mut data_cursor = Cursor::new(data);
-
-    let channel_public_key: [u8; 32] = read_value(&mut data_cursor)?;
 
     let start_time: u64 = read_value(&mut data_cursor)?;
     let end_time: u64 = read_value(&mut data_cursor)?;
     assert!(start_time <= end_time);
 
-    let channel_id: u32 = read_value(&mut data_cursor)?;
-    assert!(channel_id <= 8);
+    let channel_id: u8 = read_value(&mut data_cursor)?;
+    assert!(channel_id < 8);
 
     let subtree_count: u8 = read_value(&mut data_cursor)?;
     let subtree_count = u32::from(subtree_count);
@@ -50,9 +48,8 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let subscription = SubscriptionEntry {
         start_time,
         end_time,
-        channel_id,
-        public_key: channel_public_key,
         subtrees,
+        padding: 0,
         subtree_count,
     };
 
@@ -65,7 +62,7 @@ fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
         .zip(active[1..].iter())
         .all(|(lower, higher)| lower.highest_timestamp == higher.lowest_timestamp - 1));
 
-    Ok(subscription)
+    Ok((channel_id, subscription))
 }
 
 /// Non encrypted associated data sent with subscription.
@@ -95,8 +92,8 @@ pub fn subscribe(
         &SUBSCRIPTION_ENC_KEY,
         subscription_public_key,
     )?;
-    let entry = read_subscription(subscription_data)?;
-    context.update_subscription(&entry)?;
+    let (channel_id, entry) = read_subscription(subscription_data)?;
+    context.update_subscription(channel_id, &entry);
 
     Message::send_data(Opcode::Subscribe, &[])?;
 

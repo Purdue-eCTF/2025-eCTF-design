@@ -10,7 +10,7 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
-use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY};
+use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY, CHANNEL_PUBLIC_KEYS, CHANNEL_EXTERNAL_IDS};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -109,13 +109,11 @@ pub struct SubscriptionEntry {
     pub start_time: u64,
     /// End of subscription (inclusive)
     pub end_time: u64,
-    /// Id of channel subscription is for
-    pub channel_id: u32,
     /// Number of internal nodes in subtree for deriving frame keys
     // bigger than needed for padding
     pub subtree_count: u32,
-    /// Public key for channel
-    pub public_key: [u8; 32],
+    // No uninit required, so explicitly mention padding bytes
+    pub padding: u32,
     /// Internal nodes used to reconstruct frame keys
     // 126 is I believe worse case scenario for how many subtrees we need
     pub subtrees: [KeySubtree; 128],
@@ -145,9 +143,7 @@ impl KeySubtree {
     }
 }
 
-/// Caches certain information about channel keys to speed up the decoding process.
-///
-/// Necessary because otherwise we miss the decode speed target.
+/// Cached information about channel to speed up decoding performance.
 #[derive(Debug, Clone, Copy)]
 pub struct ChannelCache {
     /// Parsed public key used to verify frames
@@ -161,12 +157,26 @@ pub struct ChannelCache {
     pub cache_entries: ArrayVec<[KeySubtree; 64]>,
 }
 
-impl ChannelCache {
-    fn new(public_key: &[u8; 32]) -> Self {
-        ChannelCache {
-            public_key: VerifyingKey::from_bytes(public_key)
-                .expect("Failed to construct verifying key"),
-            cache_entries: ArrayVec::new(),
+/// Contains info needed to decode frames for a channel.
+struct ChannelInfo {
+    /// Contains all persistant data related to channel stored in flash.
+    flash_entry: FlashEntry<SubscriptionEntry>,
+    cache: ChannelCache,
+}
+
+impl ChannelInfo {
+    fn new(channel_id: u8) -> Self {
+        ChannelInfo {
+            // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
+            // and made to not overlap with anything else
+            flash_entry: unsafe {
+                FlashEntry::new(FLASH_DATA_ADDRS[channel_id as usize])
+            },
+            cache: ChannelCache {
+                public_key: VerifyingKey::from_bytes(&CHANNEL_PUBLIC_KEYS[channel_id as usize])
+                    .expect("Failed to construct verifying key"),
+                cache_entries: ArrayVec::new(),
+            },
         }
     }
 }
@@ -180,7 +190,7 @@ pub enum DecoderContextError {
 /// Information about channel sent back to tv for list channels
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Default, Pod, Zeroable)]
-pub struct DecoderChannelInfo {
+pub struct DecoderChannelInfoResult {
     channel_id: u32,
     start_time: u64,
     end_time: u64,
@@ -188,8 +198,8 @@ pub struct DecoderChannelInfo {
 
 /// Stores state of decoder.
 pub struct DecoderContext {
-    /// Data for all subscriptions
-    subscriptions: [(FlashEntry<SubscriptionEntry>, Option<ChannelCache>); MAX_SUBSCRIPTIONS],
+    /// Data for all subscriptions, indexed by channel id
+    subscriptions: [ChannelInfo; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
     /// PRNG used for random operations to help prevent glitching
@@ -214,31 +224,20 @@ impl DecoderContext {
             }
         }
 
-        // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
-        // and made to not overlap with anything else
-        let mut subscriptions: [(FlashEntry<SubscriptionEntry>, Option<ChannelCache>);
-            MAX_SUBSCRIPTIONS] = unsafe {
-            [
-                (FlashEntry::new(FLASH_DATA_ADDRS[0]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[1]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[2]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[3]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[4]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[5]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[6]), None),
-                (FlashEntry::new(FLASH_DATA_ADDRS[7]), None),
-            ]
-        };
-
-        // recreate cache information
-        for (subscription_entry, cache) in subscriptions.iter_mut() {
-            if let Some(subscription) = subscription_entry.get() {
-                *cache = Some(ChannelCache::new(&subscription.public_key));
-            }
-        }
+        let subscriptions = [
+            ChannelInfo::new(0),
+            ChannelInfo::new(1),
+            ChannelInfo::new(2),
+            ChannelInfo::new(3),
+            ChannelInfo::new(4),
+            ChannelInfo::new(5),
+            ChannelInfo::new(6),
+            ChannelInfo::new(7),
+        ];
 
         let subscription_public_key = VerifyingKey::from_bytes(&SUBSCRIPTION_PUBLIC_KEY)
             .expect("decoder loaded with invalid public key");
+
         DecoderContext {
             subscriptions,
             last_decoded_timestamp: None,
@@ -249,56 +248,39 @@ impl DecoderContext {
 
     pub fn get_subscription_for_channel(
         &mut self,
-        channel_id: u32,
+        channel_id: u8,
     ) -> Option<(&SubscriptionEntry, &mut ChannelCache)> {
-        self.subscriptions
-            .iter_mut()
-            .filter(|(flash_entry, cache)| flash_entry.has_object() && cache.is_some())
-            .map(|(flash_enty, cache)| (flash_enty.get().unwrap(), cache.as_mut().unwrap()))
-            .find(|(subscription, _)| subscription.channel_id == channel_id)
+        let ChannelInfo {
+            flash_entry,
+            cache,
+        } = &mut self.subscriptions[channel_id as usize];
+
+        if let Some(subscription_entry) = flash_entry.get() {
+            Some((subscription_entry, cache))
+        } else {
+            None
+        }
     }
 
     pub fn update_subscription(
         &mut self,
+        channel_id: u8,
         subscription: &SubscriptionEntry,
-    ) -> Result<(), DecoderContextError> {
-        // update subscription if it already exists
-        for (flash_entry, cache) in self.subscriptions.iter_mut() {
-            let Some(subscription_old) = flash_entry.get() else {
-                continue;
-            };
-
-            if subscription_old.channel_id == subscription.channel_id {
-                flash_entry.set(subscription);
-                *cache = Some(ChannelCache::new(&subscription.public_key));
-
-                return Ok(());
-            }
-        }
-
-        // find empty slot if no subcription for given channel exists
-        for (flash_entry, cache) in self.subscriptions.iter_mut() {
-            if !flash_entry.has_object() {
-                flash_entry.set(subscription);
-                *cache = Some(ChannelCache::new(&subscription.public_key));
-
-                return Ok(());
-            }
-        }
-
-        Err(DecoderContextError::TooManySubscriptions)
+    ) {
+        self.subscriptions[channel_id as usize].flash_entry.set(subscription);
+        self.subscriptions[channel_id as usize].cache.cache_entries.clear();
     }
 
     /// Returns a list of info about all subscribed channels.
     ///
     /// Used for the list functionality with tv.
-    pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfo; MAX_SUBSCRIPTIONS]> {
+    pub fn list_channels(&self) -> ArrayVec<[DecoderChannelInfoResult; MAX_SUBSCRIPTIONS]> {
         let mut out = ArrayVec::new();
 
-        for (flash_entry, _) in &self.subscriptions {
-            if let Some(subscription) = flash_entry.get() {
-                out.push(DecoderChannelInfo {
-                    channel_id: subscription.channel_id,
+        for (channel_id, channel_info) in self.subscriptions.iter().enumerate() {
+            if let Some(subscription) = channel_info.flash_entry.get() {
+                out.push(DecoderChannelInfoResult {
+                    channel_id: CHANNEL_EXTERNAL_IDS[channel_id],
                     start_time: subscription.start_time,
                     end_time: subscription.end_time,
                 });

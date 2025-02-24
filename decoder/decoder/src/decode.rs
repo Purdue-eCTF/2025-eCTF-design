@@ -5,7 +5,7 @@ use crate::crypto::{
     compute_chacha_block, decrypt_decoder_payload, get_decoder_payload_associated_data,
 };
 use crate::decoder_context::{ChannelCache, KeySubtree, SubscriptionEntry};
-use crate::ectf_params::{CHANNEL0_ENC_KEY, CHANNEL0_PUBLIC_KEY};
+use crate::ectf_params::{CHANNEL0_ENC_KEY, CHANNEL0_PUBLIC_KEY, EMERGENCY_CHANNEL_ID};
 use crate::message::{Message, Opcode};
 use crate::println;
 use crate::{decoder_context::DecoderContext, DecoderError};
@@ -16,8 +16,8 @@ use crate::{decoder_context::DecoderContext, DecoderError};
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct FrameAssociatedData {
-    channel_number: u32,
     timestamp: u64,
+    channel_number: u8,
 }
 
 /// Data in encoded frames.
@@ -74,18 +74,18 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
 /// Retrieve the public and symmetric keys for a frame on channel `channel_number` encoded with timestamp `timestamp`.
 fn get_keys_for_channel(
     context: &mut DecoderContext,
-    channel_number: u32,
+    channel_id: u8,
     timestamp: u64,
 ) -> Result<([u8; 32], VerifyingKey), DecoderError> {
-    if channel_number == 0 {
-        // channel 0 keys are hardcoded
+    if channel_id == EMERGENCY_CHANNEL_ID {
+        // emergency channel keys are hardcoded
         Ok((
             CHANNEL0_ENC_KEY,
             VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY).expect("Invalid public key bytes"),
         ))
     } else {
         // other channel keys are derived from subscription data
-        let Some((subscription, cache)) = context.get_subscription_for_channel(channel_number)
+        let Some((subscription, cache)) = context.get_subscription_for_channel(channel_id)
         else {
             return Err(DecoderError::InvalidSubscription);
         };

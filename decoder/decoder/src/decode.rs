@@ -5,7 +5,7 @@ use crate::crypto::{
     compute_chacha_block, decrypt_decoder_payload, get_decoder_payload_associated_data,
 };
 use crate::decoder_context::{ChannelCache, KeySubtree, SubscriptionEntry};
-use crate::ectf_params::{CHANNEL0_ENC_KEY, CHANNEL0_PUBLIC_KEY, EMERGENCY_CHANNEL_ID};
+use crate::ectf_params::{CHANNEL0_ENC_KEY, EMERGENCY_CHANNEL_ID};
 use crate::message::{Message, Opcode};
 use crate::println;
 use crate::{decoder_context::DecoderContext, DecoderError};
@@ -81,7 +81,7 @@ fn get_keys_for_channel(
         // emergency channel keys are hardcoded
         Ok((
             CHANNEL0_ENC_KEY,
-            VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY).expect("Invalid public key bytes"),
+            context.emergency_channel_public_key,
         ))
     } else {
         // other channel keys are derived from subscription data

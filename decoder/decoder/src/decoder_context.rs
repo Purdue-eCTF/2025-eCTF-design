@@ -10,7 +10,7 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
-use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY, CHANNEL_PUBLIC_KEYS, CHANNEL_EXTERNAL_IDS};
+use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY, CHANNEL0_PUBLIC_KEY, CHANNEL_PUBLIC_KEYS, CHANNEL_EXTERNAL_IDS};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -208,6 +208,8 @@ pub struct DecoderContext {
     chacha: ChaCha20Rng,
     /// Verifying public key for subscriptions
     pub subscription_public_key: VerifyingKey,
+    /// Verifying public key for frames on the emergency channel
+    pub emergency_channel_public_key: VerifyingKey,
 }
 
 impl DecoderContext {
@@ -240,11 +242,15 @@ impl DecoderContext {
         let subscription_public_key = VerifyingKey::from_bytes(&SUBSCRIPTION_PUBLIC_KEY)
             .expect("decoder loaded with invalid public key");
 
+        let emergency_channel_public_key = VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY)
+            .expect("decoder loaded with invaid public key");
+
         DecoderContext {
             subscriptions,
             last_decoded_timestamp: None,
             chacha,
             subscription_public_key,
+            emergency_channel_public_key,
         }
     }
 

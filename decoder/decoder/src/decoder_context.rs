@@ -166,6 +166,8 @@ struct ChannelInfo {
 
 impl ChannelInfo {
     fn new(channel_id: u8) -> Self {
+        let public_key = CHANNEL_PUBLIC_KEYS.get(channel_id as usize).unwrap_or(&[0; 32]);
+
         ChannelInfo {
             // safety: FLASH_DATA_ADDRS generated at build time are verified to be correct
             // and made to not overlap with anything else
@@ -173,7 +175,7 @@ impl ChannelInfo {
                 FlashEntry::new(FLASH_DATA_ADDRS[channel_id as usize])
             },
             cache: ChannelCache {
-                public_key: VerifyingKey::from_bytes(&CHANNEL_PUBLIC_KEYS[channel_id as usize])
+                public_key: VerifyingKey::from_bytes(public_key)
                     .expect("Failed to construct verifying key"),
                 cache_entries: ArrayVec::new(),
             },

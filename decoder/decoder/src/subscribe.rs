@@ -93,6 +93,7 @@ pub fn subscribe(
         subscription_public_key,
     )?;
     let (channel_id, entry) = read_subscription(subscription_data)?;
+
     context.update_subscription(channel_id, &entry);
 
     Message::send_data(Opcode::Subscribe, &[])?;

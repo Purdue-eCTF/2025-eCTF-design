@@ -65,7 +65,7 @@ class Encoder:
         return encrypt_payload(
             # data is length of frame and frame data padded with 64 bytes
             data=struct.pack("<B", len(frame)) + frame.ljust(64, b"\0"),
-            associated_data=struct.pack("<QI", timestamp, channel),
+            associated_data=struct.pack("<QB", timestamp, channel_keys.internal_id),
             symmetric_key=key,
             private_key=self.private_keys[channel],
         )

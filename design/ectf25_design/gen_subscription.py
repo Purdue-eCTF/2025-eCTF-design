@@ -61,7 +61,7 @@ def gen_subscription(
 
     # if length < 256, it can be packed into a byte
     # 126 should be the worst case
-    assert len(key_nodes) <= 128
+    assert len(key_nodes) <= 126
     logger.debug(f"Generated {len(key_nodes)} nodes")
     assert all(len(node.key) == 32 for node in key_nodes)
 

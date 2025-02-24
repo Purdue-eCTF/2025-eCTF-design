@@ -45,7 +45,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     }
 
     let (symmetric_key, public_key) =
-        get_keys_for_channel(context, frame_info.channel_number, frame_info.timestamp)?;
+        get_keys_for_channel(context, frame_info.channel_number as u8, frame_info.timestamp)?;
 
     // frame data has 1 byte at the start indicating how long it is
     // and 64 bytes after containing the data itself

@@ -1,0 +1,4 @@
+worse case subscribe:
+send: ~0.406 seconds
+
+send and process: ~0.512 seconds

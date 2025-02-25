@@ -101,8 +101,6 @@ class GlobalSecrets:
 
     @classmethod
     def generate(cls, channel_ids: list[int]) -> Self:
-        assert len(channel_ids) <= 8, "Too many channel when generating global secrets"
-
         channels = {}
         # channel 0 always exists
         channels[0] = ChannelKey.generate()

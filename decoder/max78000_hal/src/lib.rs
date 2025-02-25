@@ -6,11 +6,13 @@ pub mod gcr;
 pub mod gpio;
 pub mod i2c;
 pub mod led;
+pub mod mpu;
 pub mod prelude;
 pub mod timer;
 pub mod trng;
 pub mod uart;
 
+use mpu::Mpu;
 use thiserror_no_std::Error;
 
 pub use flash::Flash;
@@ -46,12 +48,13 @@ pub enum HalError {
 pub struct Peripherals {
     pub i2c: UninitializedI2c,
     pub trng: Trng,
+    pub mpu: Mpu,
 }
 
 impl Peripherals {
     /// Initializes all peripherals and returns them.
     pub fn take() -> Option<Peripherals> {
-        let cortex_m::peripheral::Peripherals { SYST, .. } =
+        let cortex_m::peripheral::Peripherals { SYST, MPU, .. } =
             cortex_m::peripheral::Peripherals::take()?;
 
         let max78000_device::Peripherals {
@@ -77,6 +80,7 @@ impl Peripherals {
         Some(Peripherals {
             i2c: UninitializedI2c::new(I2C1),
             trng: Trng::new(TRNG),
+            mpu: Mpu::new(MPU),
         })
     }
 }

@@ -1,4 +1,5 @@
 use bytemuck::{bytes_of, Pod, Zeroable};
+use max78000_hal::mpu::{MpuPerms, MpuRegionSize};
 use core::marker::PhantomData;
 use ed25519_dalek::VerifyingKey;
 use thiserror_no_std::Error;
@@ -214,7 +215,7 @@ pub struct DecoderContext {
 
 impl DecoderContext {
     pub fn new() -> Self {
-        let Peripherals { mut trng, .. } =
+        let Peripherals { mut trng, mut mpu, .. } =
             Peripherals::take().expect("could not initialize peripherals");
 
         let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
@@ -226,6 +227,56 @@ impl DecoderContext {
             if !FLASH_DATA_ADDRS.contains(&page_address) {
                 Flash::get().lock_page(page_address);
             }
+        }
+
+        // set up memory protections
+        unsafe {
+            // make flash executable
+            mpu.set_region(
+                0,
+                0x1000_0000,
+                MpuRegionSize::KibiByte512, // ends 0x1008_0000
+                0,
+                MpuPerms {
+                    read: true,
+                    write: false,
+                    execute: true,
+                },
+            );
+
+            // make ram read write
+            mpu.set_region(
+                1,
+                0x2000_0000,
+                MpuRegionSize::KibiByte128, // ends 0x2002_0000
+                0,
+                MpuPerms {
+                    read: true,
+                    write: true,
+                    execute: false,
+                },
+            );
+
+            // make peripheral memory read write
+            mpu.set_region(
+                2,
+                0x4000_0000,
+                MpuRegionSize::MibiByte512,
+                0,
+                MpuPerms {
+                    read: true,
+                    write: true,
+                    execute: false,
+                },
+            );
+
+            mpu.clear_region(3);
+            mpu.clear_region(4);
+            mpu.clear_region(5);
+            mpu.clear_region(6);
+            mpu.clear_region(7);
+
+            mpu.enable();
         }
 
         let subscriptions = [

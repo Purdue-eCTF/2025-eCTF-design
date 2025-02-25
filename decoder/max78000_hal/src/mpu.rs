@@ -16,7 +16,7 @@ const RASR_ENABLED: u32 = 1;
 // not exactly sure if this is right or not
 // TODO: verify which mode to use
 //const UNCACHED_SHARED: u32 = 0b100100 << 16;
-const UNCACHED_SHARED: u32 = 0b000100 << 16;
+//const UNCACHED_SHARED: u32 = 0b000100 << 16;
 
 const MPU_CTRL_ENABLE: u32 = 1;
 const MPU_CTRL_HARD_FAULT_ENABLE: u32 = 1 << 1;
@@ -39,6 +39,25 @@ pub enum MpuRegionSize {
     KibiByte128 = 0x10,
     KibiByte512 = 0x12,
     MibiByte512 = 0x1c,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum MemoryCacheType {
+    StronglyOrdered,
+    DeviceShared,
+}
+
+impl MemoryCacheType {
+    fn make_memory_type_bits(tex: u32, c: u32, b: u32, s: u32) -> u32 {
+        (tex & 0b111) << 3 | (s & 1) << 2 | (c & 1) << 1 | (b & 1)
+    }
+
+    fn to_bits(&self) -> u32 {
+        match self {
+            Self::StronglyOrdered => Self::make_memory_type_bits(0, 0, 0, 0),
+            Self::DeviceShared => Self::make_memory_type_bits(0, 0, 1, 0),
+        }
+    }
 }
 
 /// Memory protection unit
@@ -69,7 +88,7 @@ impl Mpu {
             | RBAR_ENABLED
     }
 
-    fn construct_rasr(size: MpuRegionSize, disable_mask: u8, permissions: MpuPerms) -> u32 {
+    fn construct_rasr(size: MpuRegionSize, disable_mask: u8, permissions: MpuPerms, cache_type: MemoryCacheType) -> u32 {
         let execute_disable = if permissions.execute { 0 } else { RASR_EXECUTE_DISABLE };
 
         let access_perms = match (permissions.read, permissions.write) {
@@ -80,7 +99,7 @@ impl Mpu {
 
         execute_disable
             | access_perms
-            | UNCACHED_SHARED
+            | (cache_type.to_bits() << 16)
             | ((disable_mask as u32) << 8)
             | ((size as u32) << 1)
             | RASR_ENABLED
@@ -93,9 +112,10 @@ impl Mpu {
         region_size: MpuRegionSize,
         disable_mask: u8,
         permissions: MpuPerms,
+        cache_type: MemoryCacheType,
     ) -> (u32, u32) {
         let rbar = Self::construct_rbar(region_number, base_address);
-        let rasr = Self::construct_rasr(region_size, disable_mask, permissions);
+        let rasr = Self::construct_rasr(region_size, disable_mask, permissions, cache_type);
 
         unsafe {
             self.set_region_inner(rbar, rasr);

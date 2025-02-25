@@ -1,5 +1,5 @@
 use bytemuck::{bytes_of, Pod, Zeroable};
-use max78000_hal::mpu::{MpuPerms, MpuRegionSize};
+use max78000_hal::mpu::{MemoryCacheType, MpuPerms, MpuRegionSize};
 use core::marker::PhantomData;
 use ed25519_dalek::VerifyingKey;
 use thiserror_no_std::Error;
@@ -243,6 +243,7 @@ impl DecoderContext {
                     write: false,
                     execute: true,
                 },
+                MemoryCacheType::StronglyOrdered,
             );
 
             // make ram read write
@@ -256,6 +257,7 @@ impl DecoderContext {
                     write: true,
                     execute: false,
                 },
+                MemoryCacheType::StronglyOrdered,
             );
 
             // make peripheral memory read write
@@ -269,6 +271,7 @@ impl DecoderContext {
                     write: true,
                     execute: false,
                 },
+                MemoryCacheType::StronglyOrdered,
             );
 
             mpu.clear_region(3);

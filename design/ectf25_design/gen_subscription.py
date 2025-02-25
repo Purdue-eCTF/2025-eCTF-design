@@ -70,7 +70,8 @@ def gen_subscription(
     # since nodes are continuous and sorted by range,
     # we only need to send the depth of each node
     data = (
-        struct.pack("<QQBB", start, end, channel_keys.internal_id, len(key_nodes))
+        channel_keys.public_key_bytes()
+        + struct.pack("<QQIB", start, end, channel, len(key_nodes))
         + b"".join([struct.pack("<B", node.depth()) + node.key for node in key_nodes])
     )
 

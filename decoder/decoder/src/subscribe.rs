@@ -2,20 +2,22 @@ use bytemuck::{AnyBitPattern, NoUninit, Pod, Zeroable};
 
 use crate::crypto::get_decoder_payload_associated_data;
 use crate::decoder_context::{KeySubtree, SubscriptionEntry};
-use crate::ectf_params::{SUBSCRIPTION_ENC_KEY, DECODER_ID};
+use crate::ectf_params::{DECODER_ID, EMERGENCY_CHANNEL_ID, SUBSCRIPTION_ENC_KEY};
 use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
-fn read_subscription(data: &[u8]) -> Result<(u8, SubscriptionEntry), DecoderError> {
+fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let mut data_cursor = Cursor::new(data);
+
+    let public_key: [u8; 32] = read_value(&mut data_cursor)?;
 
     let start_time: u64 = read_value(&mut data_cursor)?;
     let end_time: u64 = read_value(&mut data_cursor)?;
     assert!(start_time <= end_time);
 
-    let channel_id: u8 = read_value(&mut data_cursor)?;
-    assert!(channel_id < 8);
+    let channel_id: u32 = read_value(&mut data_cursor)?;
+    assert!(channel_id != EMERGENCY_CHANNEL_ID);
 
     let subtree_count: u8 = read_value(&mut data_cursor)?;
     let subtree_count = u32::from(subtree_count);
@@ -46,10 +48,11 @@ fn read_subscription(data: &[u8]) -> Result<(u8, SubscriptionEntry), DecoderErro
     }
 
     let subscription = SubscriptionEntry {
+        public_key,
         start_time,
         end_time,
+        channel_id,
         subtrees,
-        padding: 0,
         subtree_count,
     };
 
@@ -62,7 +65,7 @@ fn read_subscription(data: &[u8]) -> Result<(u8, SubscriptionEntry), DecoderErro
         .zip(active[1..].iter())
         .all(|(lower, higher)| lower.highest_timestamp == higher.lowest_timestamp - 1));
 
-    Ok((channel_id, subscription))
+    Ok(subscription)
 }
 
 /// Non-encrypted associated data sent with subscription.
@@ -92,9 +95,9 @@ pub fn subscribe(
         &SUBSCRIPTION_ENC_KEY,
         subscription_public_key,
     )?;
-    let (channel_id, entry) = read_subscription(subscription_data)?;
+    let entry = read_subscription(subscription_data)?;
 
-    context.update_subscription(channel_id, &entry);
+    context.update_subscription(&entry)?;
 
     Message::send_data(Opcode::Subscribe, &[])?;
 

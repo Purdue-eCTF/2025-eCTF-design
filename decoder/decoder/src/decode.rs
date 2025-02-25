@@ -17,7 +17,7 @@ use crate::{decoder_context::DecoderContext, DecoderError};
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 struct FrameAssociatedData {
     timestamp: u64,
-    channel_number: u8,
+    channel_id: u32,
 }
 
 /// Data in encoded frames.
@@ -45,7 +45,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     }
 
     let (symmetric_key, public_key) =
-        get_keys_for_channel(context, frame_info.channel_number as u8, frame_info.timestamp)?;
+        get_keys_for_channel(context, frame_info.channel_id, frame_info.timestamp)?;
 
     // frame data has 1 byte at the start indicating how long it is
     // and 64 bytes after containing the data itself
@@ -75,7 +75,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
 /// timestamp `timestamp`.
 fn get_keys_for_channel(
     context: &mut DecoderContext,
-    channel_id: u8,
+    channel_id: u32,
     timestamp: u64,
 ) -> Result<([u8; 32], VerifyingKey), DecoderError> {
     if channel_id == EMERGENCY_CHANNEL_ID {

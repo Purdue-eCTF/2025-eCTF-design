@@ -47,8 +47,6 @@ fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH]
         .to_bytes()
 }
 
-const EMERGENCY_CHANNEL_ID: u8 = 8;
-
 /// Secrets keys in global secrets file.
 ///
 /// See python secret generation for details.
@@ -64,7 +62,6 @@ struct GlobalSecrets {
 /// See python secret generation for details.
 #[derive(Debug, Deserialize)]
 struct ChannelSecrets {
-    internal_id: u8,
     root_key: [u8; 32],
     private_key: [u8; 32],
 }
@@ -123,30 +120,6 @@ fn main() {
         "CHANNEL0_PUBLIC_KEY",
         &private_key_to_public_key(&secrets.channels[&0].private_key),
     );
-
-    // preload channel public keys so subscriptions are smaller
-    let mut channel_keys = secrets.channels.iter()
-        .filter(|(_, channel_info)| channel_info.internal_id != EMERGENCY_CHANNEL_ID)
-        .collect::<Vec<_>>();
-
-    channel_keys.sort_by_key(|(_, channel_key)| channel_key.internal_id);
-    let channel_public_keys = channel_keys.iter()
-        .map(|(_, channel_key)| private_key_to_public_key(&channel_key.private_key))
-        .collect::<Vec<_>>();
-
-    let channel_external_ids = channel_keys.iter()
-        .map(|(external_channel_id, _)| **external_channel_id)
-        .collect::<Vec<_>>();
-
-    rust_code.push_str(&format!(
-        "pub const CHANNEL_PUBLIC_KEYS: [[u8; 32]; {}] = {channel_public_keys:?};\n",
-        channel_public_keys.len(),
-    ));
-
-    rust_code.push_str(&format!(
-        "pub const CHANNEL_EXTERNAL_IDS: [u32; {}] = {channel_external_ids:?};\n",
-        channel_external_ids.len(),
-    ));
 
 
     // do compile time aslr

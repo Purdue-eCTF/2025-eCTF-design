@@ -102,6 +102,7 @@ SECTIONS
     . = . + textoffset;
     __stext = .;
 
+    . = ALIGN(4);
     *(.text .text.*);
 
     /* The HardFaultTrampoline uses the `b` instruction to enter `HardFault`,

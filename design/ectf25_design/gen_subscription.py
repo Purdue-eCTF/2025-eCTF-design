@@ -39,6 +39,8 @@ def gen_subscription(
     :param channel: Channel to enable
     """
 
+    assert channel != 0, "Cannot generate subscription for emergency channel"
+
     secrets: GlobalSecrets = GlobalSecrets.from_json(secrets.decode("ascii"))
     channel_keys = secrets.channels[channel]
 

@@ -101,8 +101,6 @@ class GlobalSecrets:
         )
         decoder_id_hash = hasher.hash(decoder_id_bytes, salt=self.subscribe_root_key)
 
-        print(decoder_id_hash)
-
         # returned hash string has many paramaters encoded as well, delimeted by $
         # last element is the hash itself
         # have to add 1 = to base64 because python base64 padding is always mandatory apparently

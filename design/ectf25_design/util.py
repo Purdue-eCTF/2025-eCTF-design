@@ -107,8 +107,8 @@ class GlobalSecrets:
         # channel 0 always exists
         channels[0] = ChannelKey.generate()
 
-        for i, channel_id in enumerate(channel_ids):
-            channels[channel_id] = ChannelKey.generate(i)
+        for channel_id in channel_ids:
+            channels[channel_id] = ChannelKey.generate()
 
         return cls(
             subscribe_root_key=random(32),

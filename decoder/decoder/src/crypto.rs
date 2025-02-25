@@ -1,5 +1,5 @@
 use crate::DecoderError;
-use bytemuck::{from_bytes, Pod, Zeroable};
+use bytemuck::{pod_read_unaligned, Pod, Zeroable};
 use chacha20poly1305::{AeadInPlace, KeyInit, XChaCha20Poly1305};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey, SIGNATURE_LENGTH};
 use rand_chacha::ChaCha20Rng;
@@ -42,7 +42,7 @@ pub fn decrypt_decoder_payload<'a>(
         return Err(DecoderError::InvalidEncoderPayload);
     }
 
-    let header: DecoderPayloadHeader = *from_bytes(&payload[..size_of::<DecoderPayloadHeader>()]);
+    let header: DecoderPayloadHeader = pod_read_unaligned(&payload[..size_of::<DecoderPayloadHeader>()]);
 
     // first verify signature
     // signature should include chacha nonce and tag, otherwise attacker can alter nonce and get invalid frame
@@ -71,12 +71,12 @@ pub fn decrypt_decoder_payload<'a>(
 }
 
 /// Gets a reference to the associated data of the given decoder payload.
-pub fn get_decoder_payload_associated_data<T: Pod>(payload: &[u8]) -> Result<&T, DecoderError> {
+pub fn get_decoder_payload_associated_data<T: Pod>(payload: &[u8]) -> Result<T, DecoderError> {
     if payload.len() < size_of::<DecoderPayloadHeader>() + size_of::<T>() {
         Err(DecoderError::InvalidEncoderPayload)
     } else {
         let associated_data = &payload[payload.len() - size_of::<T>()..];
-        Ok(from_bytes(associated_data))
+        Ok(pod_read_unaligned(associated_data))
     }
 }
 

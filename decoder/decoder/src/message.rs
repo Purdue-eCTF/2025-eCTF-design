@@ -79,8 +79,8 @@ impl Opcode {
 }
 
 pub const MAGIC: u8 = b'%';
-// 5 KiB
-pub const MAX_BODY_SIZE: usize = 5120;
+// 4.5 KiB
+pub const MAX_BODY_SIZE: usize = 4608;
 const CHUNK_SIZE: usize = 256;
 
 /// Opcodes that don't require an ack response.

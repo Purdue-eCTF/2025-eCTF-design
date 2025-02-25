@@ -34,7 +34,7 @@ struct FrameData {
 
 /// Performs all functionality related to decoding frames.
 pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<(), DecoderError> {
-    let frame_info: FrameAssociatedData = *get_decoder_payload_associated_data(encoded_frame)?;
+    let frame_info: FrameAssociatedData = get_decoder_payload_associated_data(encoded_frame)?;
 
     // check frame we are decoding is monotonically increasing for security requirement 3
     if context
@@ -57,6 +57,7 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
         &public_key,
     )?;
 
+    // shouldn't have alignmanet issues, frame data is 1 byte aligned
     let frame_data: &FrameData = try_from_bytes(frame_data)?;
 
     // decoding succeeded, update last decoded timestamp

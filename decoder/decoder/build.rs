@@ -88,7 +88,7 @@ fn main() {
 
     // first generate subscription key, which is using argon2
     // these params are the one used by the python library we picked
-    // they are highed paramaters then the default ones of the rust `argon2` library
+    // they are higher parameters than the default ones of the rust `argon2` library
     let params = Params::new(65536, 3, 4, None).unwrap();
     let hasher = Argon2::new(Algorithm::Argon2id, Version::default(), params);
 
@@ -269,7 +269,7 @@ fn main() {
 
     println!("cargo:rustc-link-arg=--nmagic");
 
-    // FIXME: make sure we are not accidently using cortex-m-rt linker script
+    // FIXME: make sure we are not accidentally using cortex-m-rt linker script
     println!("cargo:rustc-link-arg=-Tlink.x");
     println!("cargo:rerun-if-changed=link.x");
 }

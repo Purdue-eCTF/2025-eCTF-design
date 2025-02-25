@@ -10,7 +10,7 @@ use crate::message::{Message, Opcode};
 use crate::println;
 use crate::{decoder_context::DecoderContext, DecoderError};
 
-/// Non encrypted associated data sent with frame.
+/// Non-encrypted associated data sent with frame.
 ///
 /// Needed because we need to know channel and timestamp for deriving encryption key.
 #[repr(C, packed)]
@@ -32,7 +32,7 @@ struct FrameData {
     frame_data: [u8; 64],
 }
 
-/// Performs all funcitonality related to decoding frames.
+/// Performs all functionality related to decoding frames.
 pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<(), DecoderError> {
     let frame_info: FrameAssociatedData = *get_decoder_payload_associated_data(encoded_frame)?;
 
@@ -71,7 +71,8 @@ pub fn decode(context: &mut DecoderContext, encoded_frame: &mut [u8]) -> Result<
     Ok(())
 }
 
-/// Retrieve the public and symmetric keys for a frame on channel `channel_number` encoded with timestamp `timestamp`.
+/// Retrieve the public and symmetric keys for a frame on channel `channel_number` encoded with
+/// timestamp `timestamp`.
 fn get_keys_for_channel(
     context: &mut DecoderContext,
     channel_id: u8,
@@ -115,7 +116,7 @@ fn derive_decoder_key_for_timestamp(
     cache: &mut ChannelCache,
     timestamp: u64,
 ) -> Result<[u8; 32], DecoderError> {
-    // check if the cache ontains information for the timestamp
+    // check if the cache contains information for the timestamp
     let mut subtree = if cache.cache_entries.len() > 0 && cache.cache_entries[0].contains(timestamp)
     {
         // search from low end of cache for first match

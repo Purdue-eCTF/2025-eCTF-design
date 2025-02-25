@@ -26,7 +26,8 @@ impl<T: Pod> FlashEntry<T> {
     ///
     /// # Safety
     ///
-    /// `address` must be the address of the start of a flash page which is not in use by anything else (references to it, code on it, etc).
+    /// `address` must be the address of the start of a flash page which is not in use by anything
+    /// else (references to it, code on it, etc.).
     unsafe fn new(address: usize) -> Self {
         // make sure T is not too big
         const {

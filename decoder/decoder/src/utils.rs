@@ -15,6 +15,7 @@ pub struct Cursor<T> {
     buf: T,
     pub offset: usize,
 }
+
 #[derive(Debug, Error)]
 pub enum CursorError {
     #[error("Too many bytes: only {0} remaining")]
@@ -44,6 +45,7 @@ where
         }
     }
 }
+
 impl<T> Cursor<T>
 where
     T: AsMut<[u8]>,
@@ -66,7 +68,7 @@ where
     }
 }
 
-impl<T> fmt::Write for Cursor<T>
+impl<T> Write for Cursor<T>
 where
     T: AsMut<[u8]>,
 {

@@ -14,9 +14,9 @@ struct DecoderPayloadHeader {
     poly1305_tag: [u8; 16],
 }
 
-/// Verifies and decrypts any payload the decoder recieves.
+/// Verifies and decrypts any payload the decoder receives.
 ///
-/// This includes both satelite frames and subscription data.
+/// This includes both satellite frames and subscription data.
 /// Decrypted data overwrites ciphertext in payload and a reference to this data is returned.
 ///
 /// # Payload Format

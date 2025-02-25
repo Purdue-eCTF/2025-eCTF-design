@@ -82,6 +82,8 @@ pub const MAGIC: u8 = b'%';
 // 5 KiB
 pub const MAX_BODY_SIZE: usize = 5120;
 const CHUNK_SIZE: usize = 256;
+
+/// Opcodes that don't require an ack response.
 const NACKS: [Opcode; 2] = [Opcode::Debug, Opcode::Ack];
 
 #[derive(Debug)]
@@ -92,6 +94,7 @@ pub struct Message {
 }
 
 impl Message {
+    /// Creates a new message from the given opcode, length, and body.
     pub fn new(opcode: Opcode, length: u16, body: [u8; MAX_BODY_SIZE]) -> Self {
         Self {
             opcode,
@@ -100,6 +103,7 @@ impl Message {
         }
     }
 
+    /// Creates a new message from the given opcode and byte slice.
     #[inline]
     pub fn from_data(opcode: Opcode, data: &[u8]) -> Self {
         let mut body = [0; MAX_BODY_SIZE];
@@ -108,11 +112,13 @@ impl Message {
         Self::new(opcode, data.len() as u16, body)
     }
 
+    /// Gets the message body as a mutable byte slice.
     #[inline]
     pub fn data_mut(&mut self) -> &mut [u8] {
         &mut self.body[..self.length.into()]
     }
 
+    /// Reads a message header from UART without reading the body.
     #[inline]
     pub fn read_header() -> Result<Self, MessageError> {
         let reader = uart();
@@ -137,6 +143,7 @@ impl Message {
         })
     }
 
+    /// Reads a complete message from UART.
     pub fn read() -> Result<Self, MessageError> {
         let reader = uart();
         let mut message = Self::read_header()?;
@@ -153,11 +160,13 @@ impl Message {
         Ok(message)
     }
 
+    /// Writes an ack to UART.
     pub fn send_ack() {
         let ack = Self::ack();
         ack.write_header();
     }
 
+    /// Reads an ack from UART.
     pub fn read_ack() -> Result<(), MessageError> {
         let message = Self::read_header()?;
 
@@ -168,6 +177,7 @@ impl Message {
         }
     }
 
+    /// Writes this message's header to UART.
     pub fn write_header(&self) {
         let writer = uart();
 
@@ -176,6 +186,7 @@ impl Message {
         writer.write_bytes(&self.length.to_le_bytes());
     }
 
+    /// Writes this message to UART.
     pub fn write(&self) -> Result<(), MessageError> {
         self.write_header();
         if !NACKS.contains(&self.opcode) {
@@ -193,6 +204,9 @@ impl Message {
         }
         Ok(())
     }
+
+    /// Convenience method to immediately create and send a message from the given
+    /// opcode and byte slice.
     pub fn send_data(opcode: Opcode, data: &[u8]) -> Result<(), MessageError> {
         if data.len() > MAX_BODY_SIZE {
             return Err(MessageError::BodyLengthError);
@@ -201,6 +215,7 @@ impl Message {
         msg.write()
     }
 
+    /// Static method to generate an ack message.
     pub const fn ack() -> Self {
         Self {
             opcode: Opcode::Ack,

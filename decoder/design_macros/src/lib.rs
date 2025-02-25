@@ -12,14 +12,14 @@ use syn::{
     TypeBareFn,
 };
 
-/// The total amount the counter will be incramented throughout all the checks
-const TOTAL_INCRAMENT_AMOUNT: u8 = 100;
+/// The total amount the counter will be incremented throughout all the checks
+const TOTAL_INCREMENT_AMOUNT: u8 = 100;
 
 struct Args {
     /// Condition to evaluate
     cond: Expr,
     success_type: TypeBareFn,
-    /// Function to call on sucess
+    /// Function to call on success
     success_fn: ExprPath,
     /// Arguments to the success function
     success_args: Punctuated<Expr, Token![,]>,
@@ -66,7 +66,7 @@ impl Parse for Args {
     }
 }
 
-/// am expresion which is the function that will panic on an incorrect jump table jump
+/// the function that will panic on an incorrect jump table jump
 fn panic_fn() -> Expr {
     let glitch_fail = PathSegment {
         ident: Ident::new("glitch_fail", Span::call_site()),
@@ -138,13 +138,13 @@ pub fn check_or_error_jump_table(item: TokenStream) -> TokenStream {
     let (jump_table_start_index, op) = if jump_table_correct_index < 128 {
         let minus_eq = Token![-=](Span::call_site());
         (
-            jump_table_correct_index + TOTAL_INCRAMENT_AMOUNT,
+            jump_table_correct_index + TOTAL_INCREMENT_AMOUNT,
             BinOp::SubAssign(minus_eq),
         )
     } else {
         let add_eq = Token![+=](Span::call_site());
         (
-            jump_table_correct_index - TOTAL_INCRAMENT_AMOUNT,
+            jump_table_correct_index - TOTAL_INCREMENT_AMOUNT,
             BinOp::AddAssign(add_eq),
         )
     };

@@ -38,7 +38,7 @@ pub enum DecoderError {
     InvalidTimestamp,
     #[error("Error: non-monotonic timestamp")]
     NonMonotonicTimestamp,
-    #[error("Error: invalid payload recieved")]
+    #[error("Error: invalid payload received")]
     InvalidEncoderPayload,
     #[error("Error: subscription is not valid for decoding the given frame")]
     InvalidSubscription,
@@ -58,7 +58,7 @@ fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {
     // first 4 bytes is number of channels
     data_cursor.read_from(&(channel_info.len() as u32).to_le_bytes())?;
 
-    // next bytes is info about channels
+    // next bytes are info about channels
     data_cursor.read_from(must_cast_slice(channel_info.as_slice()))?;
     let data = data_cursor.written();
 
@@ -98,6 +98,6 @@ fn panic(info: &PanicInfo) -> ! {
     led_on(Led::Red);
     led_off(Led::Blue);
     led_off(Led::Green);
-    let _ = utils::write_error(info);
+    let _ = write_error(info);
     loop {}
 }

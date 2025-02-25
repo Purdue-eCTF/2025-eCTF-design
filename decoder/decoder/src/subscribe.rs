@@ -65,7 +65,7 @@ fn read_subscription(data: &[u8]) -> Result<(u8, SubscriptionEntry), DecoderErro
     Ok((channel_id, subscription))
 }
 
-/// Non encrypted associated data sent with subscription.
+/// Non-encrypted associated data sent with subscription.
 ///
 /// Probably not needed but signing plaintext decoder id ensures only 1 possible symmetric
 /// key can be used to decrypt payload, just in case.

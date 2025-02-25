@@ -2,5 +2,5 @@
 
 pub mod anti_hardware;
 
-// reesoirt for const time macro
+// reexport for const time macro
 pub use subtle;

@@ -4,7 +4,7 @@ use ed25519_dalek::VerifyingKey;
 use crate::crypto::{
     compute_chacha_block, decrypt_decoder_payload, get_decoder_payload_associated_data,
 };
-use crate::decoder_context::{ChannelCache, KeySubtree, SubscriptionEntry};
+use crate::decoder_context::{ChannelCache, KeySubtree, CompressedSubscriptionEntry};
 use crate::ectf_params::{CHANNEL0_ENC_KEY, EMERGENCY_CHANNEL_ID};
 use crate::message::{Message, Opcode};
 use crate::println;
@@ -92,16 +92,6 @@ fn get_keys_for_channel(
             return Err(DecoderError::InvalidSubscription);
         };
 
-        // this check is not necessary since deriving the key should fail,
-        // but we do it just in case
-        if timestamp < subscription.start_time || timestamp > subscription.end_time {
-            println!(
-                "timestamp was {timestamp}; should be {}..={}",
-                subscription.start_time, subscription.end_time
-            );
-            return Err(DecoderError::InvalidTimestamp);
-        }
-
         // derive symmetric key based on subscription data and timestamp
         let symmetric_key = derive_decoder_key_for_timestamp(subscription, cache, timestamp)?;
 
@@ -113,7 +103,7 @@ fn get_keys_for_channel(
 ///
 /// This uses the GGM key tree discussed in design doc.
 fn derive_decoder_key_for_timestamp(
-    subscription: &SubscriptionEntry,
+    subscription: &CompressedSubscriptionEntry,
     cache: &mut ChannelCache,
     timestamp: u64,
 ) -> Result<[u8; 32], DecoderError> {
@@ -143,13 +133,9 @@ fn derive_decoder_key_for_timestamp(
 
         // otherwise locate subtree root containing the key for the timestamp we are interested in
         // from the subscription data stored in flash
-        *subscription
-            .active_subtrees()
-            .iter()
-            .find(|tree| tree.contains(timestamp))
+        subscription.get_subtree(timestamp)
             .ok_or_else(|| {
-                println!("Failed to find correct subtree");
-                println!("{:?}", subscription.active_subtrees());
+                println!("Failed to find correct subtree, timestamp not in range");
                 DecoderError::NoTimestampFound
             })?
     };

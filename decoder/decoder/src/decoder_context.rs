@@ -126,12 +126,16 @@ pub struct CompressedSubscriptionEntry {
 }
 
 impl CompressedSubscriptionEntry {
-    fn decompress(&self) -> SubscriptionEntry {
-        let mut subtrees = [KeySubtree::default(); 128];
-        let mut current_timestamp = self.start_time;
+    /// Returns the depth of the key node at the given `node_index`.
+    fn node_depth(&self, node_index: usize) -> u8 {
+        self.depths[node_index]
+    }
 
+    /// Gets the inclusive end time of this subscription entry
+    fn end_time(&self) -> u64 {
+        let mut current_timestamp = self.start_time;
         for i in 0..self.subtree_count as usize {
-            let depth: u8 = self.depths[i];
+            let depth = self.node_depth(i);
 
             let lowest_timestamp = current_timestamp;
             // prevent overflow when shift would be 64
@@ -143,50 +147,43 @@ impl CompressedSubscriptionEntry {
             let highest_timestamp = lowest_timestamp + offset;
 
             current_timestamp = highest_timestamp.wrapping_add(1); // avoid a panic if highest_timestamp == u64::MAX
-
-            let key = self.node_keys[i];
-            let subtree = KeySubtree {
-                lowest_timestamp,
-                highest_timestamp,
-                key,
-            };
-            subtrees[i as usize] = subtree;
         }
 
-        SubscriptionEntry {
-            public_key: self.public_key,
-            start_time: self.start_time,
-            end_time: current_timestamp.wrapping_sub(1),
-            channel_id: self.channel_id,
-            subtree_count: self.subtree_count,
-            subtrees,
-        }
+        // if last timestamp was u64::MAX, last addition would wrap to 0, so we undo that wrap
+        current_timestamp.wrapping_sub(1)
     }
-}
-// Subscription data after unpacking
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-pub struct SubscriptionEntry {
-    /// Public key for channel
-    pub public_key: [u8; 32],
-    /// Start of subscription (inclusive)
-    pub start_time: u64,
-    /// End of subscription (inclusive)
-    pub end_time: u64,
-    /// Channel id subscription is for
-    pub channel_id: u32,
-    /// Number of internal nodes in subtree for deriving frame keys
-    // bigger than needed for padding
-    pub subtree_count: u32,
-    /// Internal nodes used to reconstruct frame keys
-    // 126 is I believe worse case scenario for how many subtrees we need
-    pub subtrees: [KeySubtree; 128],
-}
 
-impl SubscriptionEntry {
-    /// Gets subtrees which are in use for the subscription.
-    pub fn active_subtrees(&self) -> &[KeySubtree] {
-        &self.subtrees[..self.subtree_count as usize]
+    /// Gets the subtree containing `timestamp`, or returns `None` if no such subtree exists in this subscription.
+    pub fn get_subtree(&self, timestamp: u64) -> Option<KeySubtree> {
+        let mut subtree = None;
+
+        let mut current_timestamp = self.start_time;
+        for i in 0..self.subtree_count as usize {
+            let depth = self.node_depth(i);
+
+            let lowest_timestamp = current_timestamp;
+            // prevent overflow when shift would be 64
+            let offset = if depth == 0 {
+                u64::MAX
+            } else {
+                1 << (64 - depth) - 1
+            };
+            let highest_timestamp = lowest_timestamp + offset;
+
+            if lowest_timestamp <= timestamp && timestamp <= highest_timestamp {
+                // found the subtree
+                subtree = Some(KeySubtree {
+                    lowest_timestamp,
+                    highest_timestamp,
+                    key: self.node_keys[i],
+                });
+                break;
+            }
+
+            current_timestamp = highest_timestamp.wrapping_add(1); // avoid a panic if highest_timestamp == u64::MAX
+        }
+
+        subtree
     }
 }
 
@@ -295,7 +292,6 @@ pub struct DecoderChannelInfoResult {
 pub struct DecoderContext {
     /// Data for all subscriptions, indexed by channel id
     subscriptions: [ChannelInfo; MAX_SUBSCRIPTIONS],
-    decompressed_subscriptions: [Option<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
     /// Verifying public key for subscriptions
@@ -308,7 +304,7 @@ impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
         let Peripherals {
-            mut trng, mut mpu, ..
+            mut mpu, ..
         } = Peripherals::take().expect("could not initialize peripherals");
 
         // lock all flash pages not used for storing subscription data
@@ -394,7 +390,6 @@ impl DecoderContext {
 
         DecoderContext {
             subscriptions,
-            decompressed_subscriptions: [None; MAX_SUBSCRIPTIONS],
             last_decoded_timestamp: None,
             subscription_public_key,
             emergency_channel_public_key,
@@ -419,16 +414,10 @@ impl DecoderContext {
     pub fn get_subscription_for_channel(
         &mut self,
         channel_id: u32,
-    ) -> Option<(&SubscriptionEntry, &mut ChannelCache)> {
-        let ChannelInfo { cache, .. } = self.subscriptions.iter_mut().find(
-            |channel_info| matches!(channel_info.channel_id(), Some(cid) if cid == channel_id),
-        )?;
-        let decompressed = self
-            .decompressed_subscriptions
-            .iter()
-            .flatten()
-            .find(|sub| sub.channel_id == channel_id)?;
-        Some((decompressed, cache.as_mut().unwrap()))
+    ) -> Option<(&CompressedSubscriptionEntry, &mut ChannelCache)> {
+        let ChannelInfo { flash_entry, cache } = self.get_channel_info_for_id(channel_id)?;
+
+        Some((flash_entry.get().unwrap(), cache.as_mut().unwrap()))
     }
 
     /// Updates subscription information using provided `subscription`.
@@ -442,23 +431,6 @@ impl DecoderContext {
     ) -> Result<(), DecoderContextError> {
         if let Some(channel_info) = self.get_channel_info_for_id(subscription.channel_id) {
             channel_info.set_subscription(subscription);
-            let decompressed = Some(subscription.decompress());
-
-            // update decompressed subscription in cache
-            if let Some(old_subscription) =
-                self.decompressed_subscriptions.iter_mut().find(|old_sub| {
-                    old_sub.is_some_and(|old_sub| old_sub.channel_id == subscription.channel_id)
-                })
-            {
-                *old_subscription = decompressed;
-            } else {
-                *self
-                    .decompressed_subscriptions
-                    .iter_mut()
-                    .find(|old_sub| old_sub.is_none())
-                    .expect("Cannot have more subscriptions than allowed") = decompressed;
-            };
-
             Ok(())
         } else if let Some(channel_info) = self.find_empty_channel_info() {
             channel_info.set_subscription(subscription);
@@ -478,12 +450,11 @@ impl DecoderContext {
             if let Some(subscription) = channel_info
                 .flash_entry
                 .get()
-                .map(|entry| entry.decompress())
             {
                 out.push(DecoderChannelInfoResult {
                     channel_id: subscription.channel_id,
                     start_time: subscription.start_time,
-                    end_time: subscription.end_time,
+                    end_time: subscription.end_time(),
                 });
             }
         }

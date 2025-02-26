@@ -43,6 +43,7 @@ pub enum MpuRegionSize {
 pub enum MemoryCacheType {
     StronglyOrdered,
     DeviceShared,
+    WriteBackUnshared,
 }
 
 impl MemoryCacheType {
@@ -55,6 +56,7 @@ impl MemoryCacheType {
         match self {
             Self::StronglyOrdered => Self::make_memory_type_bits(0, 0, 0, 0),
             Self::DeviceShared => Self::make_memory_type_bits(0, 0, 1, 0),
+            Self::WriteBackUnshared => Self::make_memory_type_bits(0, 1, 1, 0),
         }
     }
 }

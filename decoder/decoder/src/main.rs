@@ -4,11 +4,9 @@
 use bytemuck::PodCastError;
 use bytemuck::{checked::CheckedCastError, must_cast_slice};
 use core::panic::PanicInfo;
-use core::time::Duration;
 use cortex_m_rt::entry;
 use decoder_context::{DecoderContext, DecoderContextError};
 use max78000_hal::led::{led_off, led_on, Led};
-use max78000_hal::timer::sleep;
 use max78000_hal::HalError;
 use message::{Message, MessageError, Opcode};
 use thiserror_no_std::Error;
@@ -72,8 +70,6 @@ fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {
 #[entry]
 fn main() -> ! {
     let mut context = DecoderContext::new();
-    // there is a 1 second power up limit
-    sleep(Duration::from_millis(900));
     led_on(Led::Green);
 
     loop {

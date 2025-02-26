@@ -6,7 +6,6 @@ pub mod gpio;
 pub mod led;
 pub mod mpu;
 pub mod prelude;
-pub mod timer;
 pub mod uart;
 
 use mpu::Mpu;
@@ -45,7 +44,7 @@ pub struct Peripherals {
 impl Peripherals {
     /// Initializes all peripherals and returns them.
     pub fn take() -> Option<Peripherals> {
-        let cortex_m::peripheral::Peripherals { SYST, MPU, .. } =
+        let cortex_m::peripheral::Peripherals { MPU, .. } =
             cortex_m::peripheral::Peripherals::take()?;
 
         let max78000_device::Peripherals {
@@ -63,7 +62,6 @@ impl Peripherals {
         Uart::init(UART);
         Flash::init(FLC);
 
-        timer::init(SYST);
         led::init();
 
         Some(Peripherals {

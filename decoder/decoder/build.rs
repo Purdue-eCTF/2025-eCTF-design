@@ -208,7 +208,7 @@ fn main() {
     // if we randomize up to 100 KiB gap in text, we have a margin of error of 32 KiB
     // text aslr disabled
     //let textoffset = gen_addr(0, 0x19000, &mut rng);
-    let textoffset = 12;
+    let textoffset = 4;
     let rodataoffset = 0;
     // this random offset is a bit small since it impacts final binary size
     // don't want to waste too much space on that, since stack_start randomization already affects data placements

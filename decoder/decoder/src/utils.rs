@@ -1,12 +1,5 @@
-use core::{
-    fmt::{self, Display, Write},
-    time::Duration,
-};
+use core::fmt::{self, Display, Write};
 
-use max78000_hal::{
-    led::{led_off, led_on, Led},
-    timer::sleep,
-};
 use thiserror_no_std::Error;
 
 use crate::message::{Message, MessageError, Opcode, MAX_BODY_SIZE};
@@ -83,17 +76,6 @@ where
         self.offset += bytes.len();
 
         Ok(())
-    }
-}
-
-#[allow(unused)]
-pub fn flash_red(n: usize) {
-    const DELAY_TIME: u64 = 100;
-    for _ in 0..n {
-        led_on(Led::Red);
-        sleep(Duration::from_millis(DELAY_TIME));
-        led_off(Led::Red);
-        sleep(Duration::from_millis(DELAY_TIME));
     }
 }
 

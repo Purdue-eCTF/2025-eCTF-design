@@ -35,6 +35,25 @@ def verify_decoder(decoder_id: int):
     assert decoder_id < (2**32)
 
 
+def derive_key(root_key: bytes, identifier: bytes) -> bytes:
+    """Derives a 32 byte key from a root key and a unique identifier."""
+
+    # use argon2id to derive key from root key
+    # these are the default values, just explicitly specified, and with different salt len
+    hasher = PasswordHasher(
+        time_cost=3,
+        memory_cost=65536,
+        parallelism=4,
+        hash_len=32,
+        salt_len=32,
+    )
+    decoder_id_hash = hasher.hash(identifier, salt=root_key)
+
+    # returned hash string has many paramaters encoded as well, delimeted by $
+    # last element is the hash itself
+    # have to add 1 = to base64 because python base64 padding is always mandatory apparently
+    return base64.b64decode(decoder_id_hash.split("$")[-1] + "=")
+
 @dataclass
 class ChannelKey:
     """Keys used for a specific channel."""
@@ -75,29 +94,23 @@ class GlobalSecrets:
 
     channels: dict[int, ChannelKey]
 
-    def subscribe_signing_key(self) -> eddsa.EdDSASigScheme:
-        return bytes_to_eddsa_key(self.subscribe_private_key)
+    def subscription_signing_key_for_decoder(self, decoder_id: int) -> eddsa.EdDSASigScheme:
+        # decoder id must be 4 byte unsigned integer
+        verify_decoder(decoder_id)
+        decoder_id_bytes = struct.pack("<I", decoder_id)
+
+        # make signing keypair unique per decoder
+        private_key = derive_key(self.subscribe_private_key, decoder_id_bytes)
+
+        return bytes_to_eddsa_key(private_key)
 
     def subscription_key_for_decoder(self, decoder_id: int) -> bytes:
         # decoder id must be 4 byte unsigned integer
         verify_decoder(decoder_id)
         decoder_id_bytes = struct.pack("<I", decoder_id)
 
-        # use argon2id to derive the decoder subscription key
-        # these are the default values, just explicitly specified, and with different salt len
-        hasher = PasswordHasher(
-            time_cost=3,
-            memory_cost=65536,
-            parallelism=4,
-            hash_len=32,
-            salt_len=32,
-        )
-        decoder_id_hash = hasher.hash(decoder_id_bytes, salt=self.subscribe_root_key)
-
-        # returned hash string has many paramaters encoded as well, delimeted by $
-        # last element is the hash itself
-        # have to add 1 = to base64 because python base64 padding is always mandatory apparently
-        return base64.b64decode(decoder_id_hash.split("$")[-1] + "=")
+        # derive unique key based on decoder id
+        return derive_key(self.subscribe_root_key, decoder_id_bytes)
 
     @classmethod
     def generate(cls, channel_ids: list[int]) -> Self:

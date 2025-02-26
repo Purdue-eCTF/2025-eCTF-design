@@ -49,6 +49,7 @@ def gen_subscription(
     verify_timestamp(end)
 
     subscription_symmetric_key = secrets.subscription_key_for_decoder(device_id)
+    subscription_signing_key = secrets.subscription_signing_key_for_decoder(device_id)
 
     key_nodes = generate_subscription_nodes(channel_keys.root_key, start, end)
 
@@ -81,7 +82,7 @@ def gen_subscription(
         data,
         struct.pack("<I", device_id),
         subscription_symmetric_key,
-        secrets.subscribe_signing_key(),
+        subscription_signing_key,
     )
 
 

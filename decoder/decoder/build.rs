@@ -47,6 +47,25 @@ fn private_key_to_public_key(private_key: &SecretKey) -> [u8; PUBLIC_KEY_LENGTH]
         .to_bytes()
 }
 
+/// Derive unique 32 byte ker from `root_key` and `identifier` using Argon2id
+fn derive_key(root_key: &[u8], identifier: &[u8]) -> [u8; 32] {
+    // these params are the one used by the python library we picked
+    // they are higher parameters than the default ones of the rust `argon2` library
+    let params = Params::new(65536, 3, 4, None).unwrap();
+    let hasher = Argon2::new(Algorithm::Argon2id, Version::default(), params);
+
+    let mut new_key = [0; Params::DEFAULT_OUTPUT_LEN];
+    hasher
+        .hash_password_into(
+            identifier,
+            root_key,
+            &mut new_key,
+        )
+        .expect("failed to derive key");
+
+    new_key
+}
+
 /// Secrets keys in global secrets file.
 ///
 /// See python secret generation for details.
@@ -83,20 +102,11 @@ fn main() {
     let decoder_id =
         parse_decoder_id(&std::env::var("DECODER_ID").expect("Decoder ID not specified"));
 
-    // first generate subscription key, which is using argon2
-    // these params are the one used by the python library we picked
-    // they are higher parameters than the default ones of the rust `argon2` library
-    let params = Params::new(65536, 3, 4, None).unwrap();
-    let hasher = Argon2::new(Algorithm::Argon2id, Version::default(), params);
-
-    let mut subscription_key = [0; Params::DEFAULT_OUTPUT_LEN];
-    hasher
-        .hash_password_into(
-            &decoder_id.to_le_bytes(),
-            &secrets.subscribe_root_key,
-            &mut subscription_key,
-        )
-        .expect("failed to create device subscription key");
+    // first generate subscription ChaCha20 an ed25519 keys, which is don using argon2
+    let subscription_key = derive_key(&secrets.subscribe_root_key, &decoder_id.to_le_bytes());
+    let subscription_public_key = private_key_to_public_key(
+        &derive_key(&secrets.subscribe_private_key, &decoder_id.to_le_bytes()),
+    );
 
     // generate rust code with necessary constants
     let mut rust_code = String::new();
@@ -111,10 +121,7 @@ fn main() {
     };
 
     add_bytes("SUBSCRIPTION_ENC_KEY", &subscription_key);
-    add_bytes(
-        "SUBSCRIPTION_PUBLIC_KEY",
-        &private_key_to_public_key(&secrets.subscribe_private_key),
-    );
+    add_bytes("SUBSCRIPTION_PUBLIC_KEY", &subscription_public_key);
     add_bytes("CHANNEL0_ENC_KEY", &secrets.channels[&0].root_key);
     add_bytes(
         "CHANNEL0_PUBLIC_KEY",

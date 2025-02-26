@@ -308,7 +308,7 @@ impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
         let Peripherals {
-            mut trng, mut mpu, ..
+            mut mpu, ..
         } = Peripherals::take().expect("could not initialize peripherals");
 
         // lock all flash pages not used for storing subscription data

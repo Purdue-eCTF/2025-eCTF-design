@@ -7,7 +7,6 @@ pub mod led;
 pub mod mpu;
 pub mod prelude;
 pub mod timer;
-pub mod trng;
 pub mod uart;
 
 use mpu::Mpu;
@@ -16,7 +15,6 @@ use thiserror_no_std::Error;
 pub use flash::Flash;
 pub use gcr::Gcr;
 pub use gpio::Gpio;
-pub use trng::Trng;
 pub use uart::Uart;
 
 // frequency of various clocks on the board
@@ -41,7 +39,6 @@ pub enum HalError {
 
 /// Contains various peripheralls of the max78000 device.
 pub struct Peripherals {
-    pub trng: Trng,
     pub mpu: Mpu,
 }
 
@@ -58,7 +55,6 @@ impl Peripherals {
             GPIO0,
             GPIO2,
             UART,
-            TRNG,
             ..
         } = max78000_device::Peripherals::take()?;
 
@@ -71,7 +67,6 @@ impl Peripherals {
         led::init();
 
         Some(Peripherals {
-            trng: Trng::new(TRNG),
             mpu: Mpu::new(MPU),
         })
     }

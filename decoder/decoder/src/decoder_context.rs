@@ -7,8 +7,6 @@ use thiserror_no_std::Error;
 use max78000_hal::flash::{FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE, PAGE_MASK};
 use max78000_hal::{Flash, Peripherals};
 
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
 use tinyvec::ArrayVec;
 
 use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY, CHANNEL0_PUBLIC_KEY};
@@ -245,8 +243,6 @@ pub struct DecoderContext {
     subscriptions: [ChannelInfo; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
-    /// PRNG used for random operations to help prevent glitching
-    chacha: ChaCha20Rng,
     /// Verifying public key for subscriptions
     pub subscription_public_key: VerifyingKey,
     /// Verifying public key for frames on the emergency channel
@@ -256,10 +252,8 @@ pub struct DecoderContext {
 impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
-        let Peripherals { mut trng, mut mpu, .. } =
+        let Peripherals { mut mpu, .. } =
             Peripherals::take().expect("could not initialize peripherals");
-
-        let chacha = ChaCha20Rng::from_seed(trng.gen_nonce());
 
         // lock all flash pages not used for storing subscription data
         for page_address in
@@ -345,7 +339,6 @@ impl DecoderContext {
         DecoderContext {
             subscriptions,
             last_decoded_timestamp: None,
-            chacha,
             subscription_public_key,
             emergency_channel_public_key,
         }
@@ -413,11 +406,5 @@ impl DecoderContext {
         }
 
         out
-    }
-
-    #[allow(unused)]
-    /// Gets rng for random operations.
-    pub fn get_chacha(&mut self) -> &mut ChaCha20Rng {
-        &mut self.chacha
     }
 }

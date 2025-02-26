@@ -1,7 +1,7 @@
 use bytemuck::{bytes_of, Pod, Zeroable};
-use max78000_hal::mpu::{MemoryCacheType, MpuPerms, MpuRegionSize};
 use core::marker::PhantomData;
 use ed25519_dalek::VerifyingKey;
+use max78000_hal::mpu::{MemoryCacheType, MpuPerms, MpuRegionSize};
 use thiserror_no_std::Error;
 
 use max78000_hal::flash::{FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE, PAGE_MASK};
@@ -9,7 +9,9 @@ use max78000_hal::{Flash, Peripherals};
 
 use tinyvec::ArrayVec;
 
-use crate::ectf_params::{FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY, CHANNEL0_PUBLIC_KEY};
+use crate::ectf_params::{
+    CHANNEL0_PUBLIC_KEY, FLASH_DATA_ADDRS, MAX_SUBSCRIPTIONS, SUBSCRIPTION_PUBLIC_KEY,
+};
 
 const FLASH_ENTRY_MAGIC: u32 = 0x11aa0055;
 
@@ -45,7 +47,7 @@ impl<T: Pod> FlashEntry<T> {
     }
 
     /// Every flash entry stores a status section at the end of the page indicating if it contains valid data or not.
-    /// 
+    ///
     /// This returns address of status section.
     fn status_address(&self) -> usize {
         self.address + FLASH_PAGE_SIZE - 16
@@ -108,6 +110,62 @@ impl<T: Pod> FlashEntry<T> {
 /// Data stored on flash for each subscription.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
+pub struct CompressedSubscriptionEntry {
+    /// Public key for channel
+    pub public_key: [u8; 32],
+    /// Start of subscription (inclusive)
+    pub start_time: u64,
+    /// Channel id subscription is for
+    pub channel_id: u32,
+    /// Number of internal nodes in subtree for deriving frame keys. bigger than needed for padding
+    pub subtree_count: u32,
+    // List of depths for each node. With start_time, we can derive start+end for every node with this
+    pub depths: [u8; 128],
+    // List of keys for each node
+    pub node_keys: [[u8; 32]; 128],
+}
+
+impl CompressedSubscriptionEntry {
+    fn decompress(&self) -> SubscriptionEntry {
+        let mut subtrees = [KeySubtree::default(); 128];
+        let mut current_timestamp = self.start_time;
+
+        for i in 0..self.subtree_count as usize {
+            let depth: u8 = self.depths[i];
+
+            let lowest_timestamp = current_timestamp;
+            // prevent overflow when shift would be 64
+            let offset = if depth == 0 {
+                u64::MAX
+            } else {
+                1 << (64 - depth) - 1
+            };
+            let highest_timestamp = lowest_timestamp + offset;
+
+            current_timestamp = highest_timestamp.wrapping_add(1); // avoid a panic if highest_timestamp == u64::MAX
+
+            let key = self.node_keys[i];
+            let subtree = KeySubtree {
+                lowest_timestamp,
+                highest_timestamp,
+                key,
+            };
+            subtrees[i as usize] = subtree;
+        }
+
+        SubscriptionEntry {
+            public_key: self.public_key,
+            start_time: self.start_time,
+            end_time: current_timestamp.wrapping_sub(1),
+            channel_id: self.channel_id,
+            subtree_count: self.subtree_count,
+            subtrees,
+        }
+    }
+}
+// Subscription data after unpacking
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct SubscriptionEntry {
     /// Public key for channel
     pub public_key: [u8; 32],
@@ -115,7 +173,7 @@ pub struct SubscriptionEntry {
     pub start_time: u64,
     /// End of subscription (inclusive)
     pub end_time: u64,
-    // Channel id subscription is for
+    /// Channel id subscription is for
     pub channel_id: u32,
     /// Number of internal nodes in subtree for deriving frame keys
     // bigger than needed for padding
@@ -178,25 +236,24 @@ impl ChannelCache {
 /// Contains info needed to decode frames for a channel.
 struct ChannelInfo {
     /// Contains all persistant data related to channel stored in flash.
-    flash_entry: FlashEntry<SubscriptionEntry>,
+    flash_entry: FlashEntry<CompressedSubscriptionEntry>,
     /// Contains cached info about channel.
-    /// 
+    ///
     /// None if there is no subscription for channel.
     cache: Option<ChannelCache>,
 }
 
 impl ChannelInfo {
     /// Constructs new `ChannelInfo` object by reading from flash which may or may not contain subscription data.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// `flash_data_addr` must be the address of the start of a flash page used for storing subscription entries.
-    /// 
+    ///
     /// It cannot point to code for example.
     unsafe fn new(flash_data_addr: usize) -> Self {
-        let flash_entry: FlashEntry<SubscriptionEntry> = unsafe {
-            FlashEntry::new(flash_data_addr)
-        };
+        let flash_entry: FlashEntry<CompressedSubscriptionEntry> =
+            unsafe { FlashEntry::new(flash_data_addr) };
 
         let cache = if let Some(subscription) = flash_entry.get() {
             Some(ChannelCache::new(&subscription.public_key))
@@ -204,10 +261,7 @@ impl ChannelInfo {
             None
         };
 
-        ChannelInfo {
-            flash_entry,
-            cache,
-        }
+        ChannelInfo { flash_entry, cache }
     }
 
     /// Gets the channel id for this ChannelInfo, or `None` if it is not subscribed to any channel.
@@ -216,7 +270,7 @@ impl ChannelInfo {
     }
 
     /// Updates the subscription for this channel cache
-    fn set_subscription(&mut self, subscription: &SubscriptionEntry) {
+    fn set_subscription(&mut self, subscription: &CompressedSubscriptionEntry) {
         self.flash_entry.set(subscription);
         self.cache = Some(ChannelCache::new(&subscription.public_key));
     }
@@ -241,6 +295,7 @@ pub struct DecoderChannelInfoResult {
 pub struct DecoderContext {
     /// Data for all subscriptions, indexed by channel id
     subscriptions: [ChannelInfo; MAX_SUBSCRIPTIONS],
+    decompressed_subscriptions: [Option<SubscriptionEntry>; MAX_SUBSCRIPTIONS],
     /// Timestamp of last decoded frame (starts at 0)
     pub last_decoded_timestamp: Option<u64>,
     /// Verifying public key for subscriptions
@@ -252,8 +307,9 @@ pub struct DecoderContext {
 impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
-        let Peripherals { mut mpu, .. } =
-            Peripherals::take().expect("could not initialize peripherals");
+        let Peripherals {
+            mut trng, mut mpu, ..
+        } = Peripherals::take().expect("could not initialize peripherals");
 
         // lock all flash pages not used for storing subscription data
         for page_address in
@@ -338,6 +394,7 @@ impl DecoderContext {
 
         DecoderContext {
             subscriptions,
+            decompressed_subscriptions: [None; MAX_SUBSCRIPTIONS],
             last_decoded_timestamp: None,
             subscription_public_key,
             emergency_channel_public_key,
@@ -345,43 +402,65 @@ impl DecoderContext {
     }
 
     fn get_channel_info_for_id(&mut self, channel_id: u32) -> Option<&mut ChannelInfo> {
-        self.subscriptions.iter_mut()
-            .find(|channel_info| matches!(channel_info.channel_id(), Some(cid) if cid == channel_id))
+        self.subscriptions.iter_mut().find(
+            |channel_info| matches!(channel_info.channel_id(), Some(cid) if cid == channel_id),
+        )
     }
 
     fn find_empty_channel_info(&mut self) -> Option<&mut ChannelInfo> {
-        self.subscriptions.iter_mut()
+        self.subscriptions
+            .iter_mut()
             .find(|channel_info| channel_info.channel_id().is_none())
     }
 
-    /// Retreives bot nonvalatile and volatile cached information about a subscription on the given `channel_id`.
-    /// 
+    /// Retreives both nonvalatile and volatile cached information about a subscription on the given `channel_id`.
+    ///
     /// Returns `None` if no subscription exists for the given channel.
     pub fn get_subscription_for_channel(
         &mut self,
         channel_id: u32,
     ) -> Option<(&SubscriptionEntry, &mut ChannelCache)> {
-        let ChannelInfo {
-            flash_entry,
-            cache,
-        } = self.get_channel_info_for_id(channel_id)?;
-
-        Some((flash_entry.get().unwrap(), cache.as_mut().unwrap()))
+        let ChannelInfo { cache, .. } = self.subscriptions.iter_mut().find(
+            |channel_info| matches!(channel_info.channel_id(), Some(cid) if cid == channel_id),
+        )?;
+        let decompressed = self
+            .decompressed_subscriptions
+            .iter()
+            .flatten()
+            .find(|sub| sub.channel_id == channel_id)?;
+        Some((decompressed, cache.as_mut().unwrap()))
     }
 
     /// Updates subscription information using provided `subscription`.
-    /// 
+    ///
     /// If a subscription with the same channel id already exists, it is overwritten.
     /// If no such subscription exists, a new slot is used to store the subscription.
     /// If all 8 subscription slots have been taken, `update_subscription` will return an error.
     pub fn update_subscription(
         &mut self,
-        subscription: &SubscriptionEntry,
+        subscription: &CompressedSubscriptionEntry,
     ) -> Result<(), DecoderContextError> {
         if let Some(channel_info) = self.get_channel_info_for_id(subscription.channel_id) {
             channel_info.set_subscription(subscription);
+            let decompressed = Some(subscription.decompress());
+
+            // update decompressed subscription in cache
+            if let Some(old_subscription) =
+                self.decompressed_subscriptions.iter_mut().find(|old_sub| {
+                    old_sub.is_some_and(|old_sub| old_sub.channel_id == subscription.channel_id)
+                })
+            {
+                *old_subscription = decompressed;
+            } else {
+                *self
+                    .decompressed_subscriptions
+                    .iter_mut()
+                    .find(|old_sub| old_sub.is_none())
+                    .expect("Cannot have more subscriptions than allowed") = decompressed;
+            };
+
             Ok(())
-        } else if let Some(channel_info) = self.find_empty_channel_info()  {
+        } else if let Some(channel_info) = self.find_empty_channel_info() {
             channel_info.set_subscription(subscription);
             Ok(())
         } else {
@@ -396,7 +475,11 @@ impl DecoderContext {
         let mut out = ArrayVec::new();
 
         for channel_info in &self.subscriptions {
-            if let Some(subscription) = channel_info.flash_entry.get() {
+            if let Some(subscription) = channel_info
+                .flash_entry
+                .get()
+                .map(|entry| entry.decompress())
+            {
                 out.push(DecoderChannelInfoResult {
                     channel_id: subscription.channel_id,
                     start_time: subscription.start_time,

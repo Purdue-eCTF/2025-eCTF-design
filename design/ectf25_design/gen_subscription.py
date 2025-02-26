@@ -72,8 +72,9 @@ def gen_subscription(
     # we only need to send the depth of each node
     data = (
         channel_keys.public_key_bytes()
-        + struct.pack("<QQIB", start, end, channel, len(key_nodes))
-        + b"".join([struct.pack("<B", node.depth()) + node.key for node in key_nodes])
+        + struct.pack("<QIB", start, channel, len(key_nodes))
+        + b"".join([struct.pack("<B", node.depth()) for node in key_nodes])
+        + b"".join([node.key for node in key_nodes])
     )
 
     logger.debug(f"Total length = {len(data)}")

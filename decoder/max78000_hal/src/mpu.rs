@@ -13,15 +13,10 @@ const RASR_RW_PRIVILEGED: u32 = 1 << 24;
 const RASR_RO_PRIVILEGED: u32 = 0b101 << 24;
 const RASR_ENABLED: u32 = 1;
 
-// not exactly sure if this is right or not
-// TODO: verify which mode to use
-//const UNCACHED_SHARED: u32 = 0b100100 << 16;
-//const UNCACHED_SHARED: u32 = 0b000100 << 16;
-
 const MPU_CTRL_ENABLE: u32 = 1;
 const MPU_CTRL_HARD_FAULT_ENABLE: u32 = 1 << 1;
 
-/// Represents permisions for mpu region
+/// Represents permisions for mpu region.
 #[derive(Debug, Clone, Copy)]
 pub struct MpuPerms {
     pub read: bool,
@@ -29,7 +24,8 @@ pub struct MpuPerms {
     pub execute: bool,
 }
 
-/// Possible sizes for mpu region
+/// Possible sizes for mpu region.
+// only some possible values are specified, add more later if more sizes are needed
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
 pub enum MpuRegionSize {
@@ -41,6 +37,8 @@ pub enum MpuRegionSize {
     MibiByte512 = 0x1c,
 }
 
+/// Represents caching behavior cpu will use when accessing a regin of memory.
+// there are more possible caching behaviors, but we don't need them so they aren't yet added
 #[derive(Debug, Clone, Copy)]
 pub enum MemoryCacheType {
     StronglyOrdered,
@@ -52,6 +50,7 @@ impl MemoryCacheType {
         (tex & 0b111) << 3 | (s & 1) << 2 | (c & 1) << 1 | (b & 1)
     }
 
+    /// Convert MemoryCacheType to tex, c, b, and s bits in the rasr register.
     fn to_bits(&self) -> u32 {
         match self {
             Self::StronglyOrdered => Self::make_memory_type_bits(0, 0, 0, 0),
@@ -78,6 +77,7 @@ impl Mpu {
         }
     }
 
+    /// Contruct base address register, which specifies region number and start address of memory region.
     fn construct_rbar(region_number: u32, base_address: u32) -> u32 {
         // cortex m4 apparently only have 8 slots
         assert!(region_number < 8);
@@ -88,6 +88,7 @@ impl Mpu {
             | RBAR_ENABLED
     }
 
+    // Construct rasr value, which specfies size of memory region, as well as access permissions and caching behavior.
     fn construct_rasr(size: MpuRegionSize, disable_mask: u8, permissions: MpuPerms, cache_type: MemoryCacheType) -> u32 {
         let execute_disable = if permissions.execute { 0 } else { RASR_EXECUTE_DISABLE };
 
@@ -105,6 +106,7 @@ impl Mpu {
             | RASR_ENABLED
     }
 
+    /// Set the entry corresponding to `region_number` to have all the specified attributes.
     pub unsafe fn set_region(
         &mut self,
         region_number: u32,
@@ -124,6 +126,7 @@ impl Mpu {
         (rbar, rasr)
     }
 
+    /// Clears the given region number from any memory protections.
     pub unsafe fn clear_region(&mut self, region_number: u32) {
         assert!(region_number < 8);
 
@@ -132,6 +135,7 @@ impl Mpu {
         }
     }
 
+    /// Enables the MPU.
     pub unsafe fn enable(&mut self) {
         unsafe {
             self.regs.ctrl.write(MPU_CTRL_ENABLE | MPU_CTRL_HARD_FAULT_ENABLE);

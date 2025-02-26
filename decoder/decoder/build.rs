@@ -1,7 +1,7 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use ed25519_dalek::{SecretKey, SigningKey, PUBLIC_KEY_LENGTH};
 use rand::rngs::ThreadRng;
-use rand::seq::IteratorRandom;
+//use rand::seq::IteratorRandom;
 use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -121,6 +121,14 @@ fn main() {
         &private_key_to_public_key(&secrets.channels[&0].private_key),
     );
 
+    // NOTE: We had to partially disable compile time aslr due to very bizzare issues with
+    // the flash controller and certain builds just having issues
+    // don't know the cause, but disabling random compilation means we at least
+    // can settle on a consistant build which will pass the test cases
+    //
+    // Left in the comments just for reference, in case we reenable it
+    //
+    // For now randomization of code section and where subscription data is stored is disabled
 
     // do compile time aslr
     // ASLR randomizes as following:
@@ -171,8 +179,8 @@ fn main() {
     // |--------------------------------------------------------------------------------|
     // | .bss                                                                           |
     // |--------------------------------------------------------------------------------|
-    const FLASH_START: usize = 0x10000000;
-    const FLASH_PAGE_SIZE: usize = 8192;
+    const _FLASH_START: usize = 0x10000000;
+    const _FLASH_PAGE_SIZE: usize = 8192;
 
     let mut rng = rand::thread_rng();
 
@@ -191,7 +199,9 @@ fn main() {
     // by default decoder is ~92 KiB
     // flash available for bootloader to flash our code is 224 KiB
     // if we randomize up to 100 KiB gap in text, we have a margin of error of 32 KiB
-    let textoffset = gen_addr(0, 0x19000, &mut rng);
+    // text aslr disabled
+    //let textoffset = gen_addr(0, 0x19000, &mut rng);
+    let textoffset = 0;
     let rodataoffset = 0;
     // this random offset is a bit small since it impacts final binary size
     // don't want to waste too much space on that, since stack_start randomization already affects data placements
@@ -201,12 +211,24 @@ fn main() {
 
     // now determine which 8 pages to use for storing flash data
     // possible pages are 37 to 62 inclusive as described above
-    let data_pages = 37..=62;
-    let used_data_pages = data_pages
-        .choose_multiple(&mut rng, 8)
-        .iter()
-        .map(|page_number| FLASH_START + page_number * FLASH_PAGE_SIZE)
-        .collect::<Vec<_>>();
+    // let data_pages = 37..=62;
+    // let used_data_pages = data_pages
+    //     .choose_multiple(&mut rng, 8)
+    //     .iter()
+    //     .map(|page_number| FLASH_START + page_number * FLASH_PAGE_SIZE)
+    //     .collect::<Vec<_>>();
+    // Disabled because of flash issues, hardcode pages used to be starting at 0x10050000,
+    // with 1 gap in between each
+    let used_data_pages = [
+        0x10050000,
+        0x10054000,
+        0x10058000,
+        0x1005c000,
+        0x10060000,
+        0x10064000,
+        0x10068000,
+        0x1006c000,
+    ];
 
     rust_code.push_str(&format!(
         "pub const FLASH_DATA_ADDRS: [usize; 8] = {used_data_pages:?};\n",

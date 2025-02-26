@@ -14,8 +14,6 @@ fn read_subscription(data: &[u8]) -> Result<CompressedSubscriptionEntry, Decoder
     let public_key: [u8; 32] = read_value(&mut data_cursor)?;
 
     let start_time: u64 = read_value(&mut data_cursor)?;
-    let end_time: u64 = read_value(&mut data_cursor)?;
-    assert!(start_time <= end_time);
 
     let channel_id: u32 = read_value(&mut data_cursor)?;
     assert!(channel_id != EMERGENCY_CHANNEL_ID);

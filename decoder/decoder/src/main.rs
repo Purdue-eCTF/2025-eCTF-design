@@ -50,6 +50,7 @@ pub enum DecoderError {
     DecoderContextError(#[from] DecoderContextError),
 }
 
+/// Performs the list channels functionality required by host tools.
 fn list_channels(context: &mut DecoderContext) -> Result<(), DecoderError> {
     let channel_info = context.list_channels();
 
@@ -77,7 +78,7 @@ fn main() -> ! {
 
     loop {
         if let Ok(mut message) = Message::read() {
-            let opcode = message.opcode;
+            //let opcode = message.opcode;
             //println!("got message: {opcode:?}");
             let result = match message.opcode {
                 Opcode::List => list_channels(&mut context),

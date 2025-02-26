@@ -7,6 +7,7 @@ use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
+/// Parses subscription entry from subecription data plaintext.
 fn read_subscription(data: &[u8]) -> Result<SubscriptionEntry, DecoderError> {
     let mut data_cursor = Cursor::new(data);
 
@@ -78,6 +79,7 @@ struct SubscriptionAssociatedData {
     decoder_id: u32,
 }
 
+/// Performs subscribe functionality required by host tools.
 pub fn subscribe(
     context: &mut DecoderContext,
     subscribe_data: &mut [u8],

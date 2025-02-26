@@ -46,10 +46,14 @@ impl<T: Pod> FlashEntry<T> {
         }
     }
 
+    /// Every flash entry stores a status section at the end of the page indicating if it contains valid data or not.
+    /// 
+    /// This returns address of status section.
     fn status_address(&self) -> usize {
         self.address + FLASH_PAGE_SIZE - 16
     }
 
+    /// Retreive status indicating if `FlashEntry` contains data or not.
     fn status(&self) -> u32 {
         let ptr = self.status_address() as *const u32;
 
@@ -124,6 +128,7 @@ pub struct SubscriptionEntry {
 }
 
 impl SubscriptionEntry {
+    /// Gets subtrees which are in use for the subscription.
     pub fn active_subtrees(&self) -> &[KeySubtree] {
         &self.subtrees[..self.subtree_count as usize]
     }
@@ -142,6 +147,7 @@ pub struct KeySubtree {
 }
 
 impl KeySubtree {
+    /// Checks if the leaf key node corresponding to `timestamp` lies within this subtree.
     pub fn contains(&self, timestamp: u64) -> bool {
         self.lowest_timestamp <= timestamp && timestamp <= self.highest_timestamp
     }
@@ -182,6 +188,13 @@ struct ChannelInfo {
 }
 
 impl ChannelInfo {
+    /// Constructs new `ChannelInfo` object by reading from flash which may or may not contain subscription data.
+    /// 
+    /// # Safety
+    /// 
+    /// `flash_data_addr` must be the address of the start of a flash page used for storing subscription entries.
+    /// 
+    /// It cannot point to code for example.
     unsafe fn new(flash_data_addr: usize) -> Self {
         let flash_entry: FlashEntry<SubscriptionEntry> = unsafe {
             FlashEntry::new(flash_data_addr)
@@ -217,7 +230,7 @@ pub enum DecoderContextError {
     TooManySubscriptions,
 }
 
-/// Information about channel sent back to tv for list channels
+/// Format of information about channel sent back to tv host tools for list channels command.
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, Default, Pod, Zeroable)]
 pub struct DecoderChannelInfoResult {
@@ -241,6 +254,7 @@ pub struct DecoderContext {
 }
 
 impl DecoderContext {
+    /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
         let Peripherals { mut trng, mut mpu, .. } =
             Peripherals::take().expect("could not initialize peripherals");
@@ -347,6 +361,9 @@ impl DecoderContext {
             .find(|channel_info| channel_info.channel_id().is_none())
     }
 
+    /// Retreives bot nonvalatile and volatile cached information about a subscription on the given `channel_id`.
+    /// 
+    /// Returns `None` if no subscription exists for the given channel.
     pub fn get_subscription_for_channel(
         &mut self,
         channel_id: u32,
@@ -359,6 +376,11 @@ impl DecoderContext {
         Some((flash_entry.get().unwrap(), cache.as_mut().unwrap()))
     }
 
+    /// Updates subscription information using provided `subscription`.
+    /// 
+    /// If a subscription with the same channel id already exists, it is overwritten.
+    /// If no such subscription exists, a new slot is used to store the subscription.
+    /// If all 8 subscription slots have been taken, `update_subscription` will return an error.
     pub fn update_subscription(
         &mut self,
         subscription: &SubscriptionEntry,

@@ -218,7 +218,6 @@ dependencies = [
  "chacha20poly1305",
  "cortex-m",
  "cortex-m-rt",
- "design_utils",
  "ed25519-dalek",
  "max78000_hal",
  "rand",
@@ -228,26 +227,6 @@ dependencies = [
  "serde_json",
  "thiserror-no-std",
  "tinyvec",
-]
-
-[[package]]
-name = "design_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "rand",
- "syn 2.0.96",
-]
-
-[[package]]
-name = "design_utils"
-version = "0.1.0"
-dependencies = [
- "design_macros",
- "max78000_hal",
- "rand_core",
- "subtle",
 ]
 
 [[package]]

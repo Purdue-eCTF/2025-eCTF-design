@@ -1,10 +1,8 @@
 #![no_std]
 
-mod committed_array;
 pub mod flash;
 pub mod gcr;
 pub mod gpio;
-pub mod i2c;
 pub mod led;
 pub mod mpu;
 pub mod prelude;
@@ -18,7 +16,6 @@ use thiserror_no_std::Error;
 pub use flash::Flash;
 pub use gcr::Gcr;
 pub use gpio::Gpio;
-pub use i2c::{ClientI2c, MasterI2c, UninitializedI2c};
 pub use trng::Trng;
 pub use uart::Uart;
 
@@ -40,13 +37,10 @@ pub enum HalError {
     I2cConnectionError,
     #[error("Error: timeout occured")]
     Timeout,
-    #[error("Error with committed array: {0}")]
-    CommittedArrayError(#[from] committed_array::CommittedArrayError),
 }
 
 /// Contains various peripheralls of the max78000 device.
 pub struct Peripherals {
-    pub i2c: UninitializedI2c,
     pub trng: Trng,
     pub mpu: Mpu,
 }
@@ -60,7 +54,6 @@ impl Peripherals {
         let max78000_device::Peripherals {
             FLC,
             GCR,
-            I2C1,
             LPGCR,
             GPIO0,
             GPIO2,
@@ -78,7 +71,6 @@ impl Peripherals {
         led::init();
 
         Some(Peripherals {
-            i2c: UninitializedI2c::new(I2C1),
             trng: Trng::new(TRNG),
             mpu: Mpu::new(MPU),
         })

@@ -142,7 +142,7 @@ impl CompressedSubscriptionEntry {
             let offset = if depth == 0 {
                 u64::MAX
             } else {
-                1 << (64 - depth) - 1
+                (1 << (64 - depth)) - 1
             };
             let highest_timestamp = lowest_timestamp + offset;
 
@@ -166,7 +166,7 @@ impl CompressedSubscriptionEntry {
             let offset = if depth == 0 {
                 u64::MAX
             } else {
-                1 << (64 - depth) - 1
+                (1 << (64 - depth)) - 1
             };
             let highest_timestamp = lowest_timestamp + offset;
 

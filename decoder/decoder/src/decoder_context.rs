@@ -2,6 +2,7 @@ use bytemuck::{bytes_of, Pod, Zeroable};
 use core::marker::PhantomData;
 use ed25519_dalek::VerifyingKey;
 use max78000_hal::mpu::{MemoryCacheType, MpuPerms, MpuRegionSize};
+use max78000_hal::Icc;
 use thiserror_no_std::Error;
 
 use max78000_hal::flash::{FLASH_BASE_ADDR, FLASH_PAGE_SIZE, FLASH_SIZE, PAGE_MASK};
@@ -76,7 +77,12 @@ impl<T: Pod> FlashEntry<T> {
         }
     }
 
-    pub fn set(&mut self, object: &T) {
+    /// Sets the contents of the flash entry.
+    /// 
+    /// # Safety
+    /// 
+    /// Must ensure the ICC is disabled before calling this.
+    pub unsafe fn set(&mut self, object: &T) {
         let flash = Flash::get();
 
         // convert object to bytes
@@ -267,8 +273,14 @@ impl ChannelInfo {
     }
 
     /// Updates the subscription for this channel cache
-    fn set_subscription(&mut self, subscription: &CompressedSubscriptionEntry) {
-        self.flash_entry.set(subscription);
+    /// 
+    /// # Safety
+    /// 
+    /// Must ensure ICC is disabled before calling this function
+    unsafe fn set_subscription(&mut self, subscription: &CompressedSubscriptionEntry) {
+        unsafe {
+            self.flash_entry.set(subscription);
+        }
         self.cache = Some(ChannelCache::new(&subscription.public_key));
     }
 }
@@ -298,12 +310,14 @@ pub struct DecoderContext {
     pub subscription_public_key: VerifyingKey,
     /// Verifying public key for frames on the emergency channel
     pub emergency_channel_public_key: VerifyingKey,
+    /// Instruction cache controller
+    icc: Icc,
 }
 
 impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
-        let Peripherals { mut mpu, .. } =
+        let Peripherals { mut icc, mut mpu, .. } =
             Peripherals::take().expect("could not initialize peripherals");
 
         // lock all flash pages not used for storing subscription data
@@ -387,11 +401,14 @@ impl DecoderContext {
         let emergency_channel_public_key = VerifyingKey::from_bytes(&CHANNEL0_PUBLIC_KEY)
             .expect("decoder loaded with invaid public key");
 
+        icc.enable();
+
         DecoderContext {
             subscriptions,
             last_decoded_timestamp: None,
             subscription_public_key,
             emergency_channel_public_key,
+            icc,
         }
     }
 
@@ -428,15 +445,27 @@ impl DecoderContext {
         &mut self,
         subscription: &CompressedSubscriptionEntry,
     ) -> Result<(), DecoderContextError> {
-        if let Some(channel_info) = self.get_channel_info_for_id(subscription.channel_id) {
-            channel_info.set_subscription(subscription);
+        self.icc.disable();
+
+        let result = if let Some(channel_info) = self.get_channel_info_for_id(subscription.channel_id) {
+            // safety: icc is disabled while setting subscription
+            unsafe {
+                channel_info.set_subscription(subscription);
+            }
             Ok(())
         } else if let Some(channel_info) = self.find_empty_channel_info() {
-            channel_info.set_subscription(subscription);
+            // safety: icc is disabled while setting subscription
+            unsafe {
+                channel_info.set_subscription(subscription);
+            }
             Ok(())
         } else {
             Err(DecoderContextError::TooManySubscriptions)
-        }
+        };
+
+        self.icc.enable();
+
+        result
     }
 
     /// Returns a list of info about all subscribed channels.

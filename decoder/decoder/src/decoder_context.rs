@@ -155,10 +155,11 @@ impl CompressedSubscriptionEntry {
 
     /// Gets the subtree containing `timestamp`, or returns `None` if no such subtree exists in this subscription.
     pub fn get_subtree(&self, timestamp: u64) -> Option<KeySubtree> {
-        let mut subtree = None;
-
         let mut current_timestamp = self.start_time;
         for i in 0..self.subtree_count as usize {
+            // At a given depth, the tree is 2^(64 - depth) nodes wide.
+            // Since the lowest and highest timestamps are inclusive, the range between them is one less than that,
+            // so we can calculate `highest` as `lowest + 2^(64 - depth) - 1`
             let depth = self.node_depth(i);
 
             let lowest_timestamp = current_timestamp;
@@ -172,18 +173,17 @@ impl CompressedSubscriptionEntry {
 
             if lowest_timestamp <= timestamp && timestamp <= highest_timestamp {
                 // found the subtree
-                subtree = Some(KeySubtree {
+                return Some(KeySubtree {
                     lowest_timestamp,
                     highest_timestamp,
                     key: self.node_keys[i],
                 });
-                break;
             }
 
             current_timestamp = highest_timestamp.wrapping_add(1); // avoid a panic if highest_timestamp == u64::MAX
         }
 
-        subtree
+        None
     }
 }
 
@@ -247,7 +247,7 @@ impl ChannelInfo {
     ///
     /// `flash_data_addr` must be the address of the start of a flash page used for storing subscription entries.
     ///
-    /// It cannot point to code for example.
+    /// It cannot point to code, for example.
     unsafe fn new(flash_data_addr: usize) -> Self {
         let flash_entry: FlashEntry<CompressedSubscriptionEntry> =
             unsafe { FlashEntry::new(flash_data_addr) };
@@ -303,9 +303,8 @@ pub struct DecoderContext {
 impl DecoderContext {
     /// Initialize decoder state and setup all necessary peripherals.
     pub fn new() -> Self {
-        let Peripherals {
-            mut mpu, ..
-        } = Peripherals::take().expect("could not initialize peripherals");
+        let Peripherals { mut mpu, .. } =
+            Peripherals::take().expect("could not initialize peripherals");
 
         // lock all flash pages not used for storing subscription data
         for page_address in
@@ -447,10 +446,7 @@ impl DecoderContext {
         let mut out = ArrayVec::new();
 
         for channel_info in &self.subscriptions {
-            if let Some(subscription) = channel_info
-                .flash_entry
-                .get()
-            {
+            if let Some(subscription) = channel_info.flash_entry.get() {
                 out.push(DecoderChannelInfoResult {
                     channel_id: subscription.channel_id,
                     start_time: subscription.start_time,

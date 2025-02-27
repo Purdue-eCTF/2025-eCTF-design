@@ -25,7 +25,7 @@ pub fn force_rerun() {
 
 /// Generate an address that is a multiple of 8.
 ///
-/// Most need to be a multiple of 4, but stack needs to be a multiple of 8).
+/// Most need to be a multiple of 4, but stack needs to be a multiple of 8.
 fn gen_addr(start: u32, end: u32, rng: &mut ThreadRng) -> u32 {
     rng.gen_range((start / 8 + 1)..(end / 8)) * 8
 }
@@ -56,11 +56,7 @@ fn derive_key(root_key: &[u8], identifier: &[u8]) -> [u8; 32] {
 
     let mut new_key = [0; Params::DEFAULT_OUTPUT_LEN];
     hasher
-        .hash_password_into(
-            identifier,
-            root_key,
-            &mut new_key,
-        )
+        .hash_password_into(identifier, root_key, &mut new_key)
         .expect("failed to derive key");
 
     new_key
@@ -104,9 +100,10 @@ fn main() {
 
     // first generate subscription ChaCha20 an ed25519 keys, which is don using argon2
     let subscription_key = derive_key(&secrets.subscribe_root_key, &decoder_id.to_le_bytes());
-    let subscription_public_key = private_key_to_public_key(
-        &derive_key(&secrets.subscribe_private_key, &decoder_id.to_le_bytes()),
-    );
+    let subscription_public_key = private_key_to_public_key(&derive_key(
+        &secrets.subscribe_private_key,
+        &decoder_id.to_le_bytes(),
+    ));
 
     // generate rust code with necessary constants
     let mut rust_code = String::new();
@@ -227,13 +224,7 @@ fn main() {
     // Disabled because of flash issues, hardcode pages used to be starting at 0x10050000,
     // with 1 gap in between each
     let used_data_pages = [
-        0x10050000,
-        0x10054000,
-        0x10058000,
-        0x1005c000,
-        0x10060000,
-        0x10064000,
-        0x10068000,
+        0x10050000, 0x10054000, 0x10058000, 0x1005c000, 0x10060000, 0x10064000, 0x10068000,
         0x1006c000,
     ];
 

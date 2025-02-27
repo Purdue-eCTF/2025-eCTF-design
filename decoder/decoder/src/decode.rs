@@ -4,7 +4,7 @@ use ed25519_dalek::VerifyingKey;
 use crate::crypto::{
     compute_chacha_block, decrypt_decoder_payload, get_decoder_payload_associated_data,
 };
-use crate::decoder_context::{ChannelCache, KeySubtree, CompressedSubscriptionEntry};
+use crate::decoder_context::{ChannelCache, CompressedSubscriptionEntry, KeySubtree};
 use crate::ectf_params::{CHANNEL0_ENC_KEY, EMERGENCY_CHANNEL_ID};
 use crate::message::{Message, Opcode};
 use crate::println;
@@ -81,14 +81,10 @@ fn get_keys_for_channel(
 ) -> Result<([u8; 32], VerifyingKey), DecoderError> {
     if channel_id == EMERGENCY_CHANNEL_ID {
         // emergency channel keys are hardcoded
-        Ok((
-            CHANNEL0_ENC_KEY,
-            context.emergency_channel_public_key,
-        ))
+        Ok((CHANNEL0_ENC_KEY, context.emergency_channel_public_key))
     } else {
         // other channel keys are derived from subscription data
-        let Some((subscription, cache)) = context.get_subscription_for_channel(channel_id)
-        else {
+        let Some((subscription, cache)) = context.get_subscription_for_channel(channel_id) else {
             return Err(DecoderError::InvalidSubscription);
         };
 
@@ -133,11 +129,10 @@ fn derive_decoder_key_for_timestamp(
 
         // otherwise locate subtree root containing the key for the timestamp we are interested in
         // from the subscription data stored in flash
-        subscription.get_subtree(timestamp)
-            .ok_or_else(|| {
-                println!("Failed to find correct subtree, timestamp not in range");
-                DecoderError::NoTimestampFound
-            })?
+        subscription.get_subtree(timestamp).ok_or_else(|| {
+            println!("Failed to find correct subtree, timestamp not in range");
+            DecoderError::NoTimestampFound
+        })?
     };
 
     assert!(subtree.contains(timestamp));

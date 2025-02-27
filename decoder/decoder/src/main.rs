@@ -32,8 +32,6 @@ pub enum DecoderError {
     SuspiciousActivity,
     #[error("Error: timestamp not found in subtrees")]
     NoTimestampFound,
-    #[error("Error: timestamp is out of bounds")]
-    InvalidTimestamp,
     #[error("Error: non-monotonic timestamp")]
     NonMonotonicTimestamp,
     #[error("Error: invalid payload received")]
@@ -74,8 +72,7 @@ fn main() -> ! {
 
     loop {
         if let Ok(mut message) = Message::read() {
-            //let opcode = message.opcode;
-            //println!("got message: {opcode:?}");
+            // println!("got message: {:?}", message.opcode);
             let result = match message.opcode {
                 Opcode::List => list_channels(&mut context),
                 Opcode::Subscribe => subscribe::subscribe(&mut context, message.data_mut()),

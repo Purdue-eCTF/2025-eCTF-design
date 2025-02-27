@@ -42,7 +42,8 @@ pub fn decrypt_decoder_payload<'a>(
         return Err(DecoderError::InvalidEncoderPayload);
     }
 
-    let header: DecoderPayloadHeader = pod_read_unaligned(&payload[..size_of::<DecoderPayloadHeader>()]);
+    let header: DecoderPayloadHeader =
+        pod_read_unaligned(&payload[..size_of::<DecoderPayloadHeader>()]);
 
     // first verify signature
     // signature should include chacha nonce and tag, otherwise attacker can alter nonce and get invalid frame

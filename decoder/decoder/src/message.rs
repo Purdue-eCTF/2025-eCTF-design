@@ -64,23 +64,11 @@ impl From<Opcode> for u8 {
     }
 }
 
-impl Opcode {
-    #[allow(unused)]
-    fn name(&self) -> &'static str {
-        match self {
-            Self::Decode => "Decode",
-            Self::Subscribe => "Subscribe",
-            Self::List => "List",
-            Self::Ack => "Ack",
-            Self::Debug => "Debug",
-            Self::Error => "Error",
-        }
-    }
-}
-
+/// Value required at the start of every message
 pub const MAGIC: u8 = b'%';
-// 4.5 KiB
+/// Maximum body size for a message: 4.5 KiB
 pub const MAX_BODY_SIZE: usize = 4608;
+/// Messages get sent in 256-byte chunks, with an ack for each chunk
 const CHUNK_SIZE: usize = 256;
 
 /// Opcodes that don't require an ack response.

@@ -7,7 +7,7 @@ use crate::message::{Message, Opcode};
 use crate::utils::{Cursor, CursorError};
 use crate::{crypto::decrypt_decoder_payload, decoder_context::DecoderContext, DecoderError};
 
-/// Parses subscription entry from subecription data plaintext.
+/// Parses subscription entry from subscription data plaintext.
 fn read_subscription(data: &[u8]) -> Result<CompressedSubscriptionEntry, DecoderError> {
     let mut data_cursor = Cursor::new(data);
 
@@ -18,8 +18,7 @@ fn read_subscription(data: &[u8]) -> Result<CompressedSubscriptionEntry, Decoder
     let channel_id: u32 = read_value(&mut data_cursor)?;
     assert!(channel_id != EMERGENCY_CHANNEL_ID);
 
-    let subtree_count: u8 = read_value(&mut data_cursor)?;
-    let subtree_count = u32::from(subtree_count);
+    let subtree_count = u32::from(read_value::<u8>(&mut data_cursor)?);
     assert!(subtree_count <= 128);
 
     let mut depths = [0u8; 128];
@@ -29,28 +28,18 @@ fn read_subscription(data: &[u8]) -> Result<CompressedSubscriptionEntry, Decoder
     data_cursor.read_into(bytemuck::cast_slice_mut(
         &mut node_keys[..subtree_count as usize],
     ))?;
-    /*
-    To save time on flash writes, we store the subscription entry "compressed" (using depths instead of start/end) in flash
-    and then decompress later
-    */
+
+    // To save time on flash writes, we store the subscription entry "compressed" (using depths instead of start/end) in flash
+    // rather than "decompressing" into individual `KeySubtree`s.
 
     let subscription = CompressedSubscriptionEntry {
         public_key,
         start_time,
-        depths,
-        node_keys,
         channel_id,
         subtree_count,
+        depths,
+        node_keys,
     };
-
-    // // make sure the whole valid range is covered
-    // let active = subscription.active_subtrees();
-    // assert!(active[0].lowest_timestamp == start_time);
-    // assert!(active.last().unwrap().highest_timestamp == end_time);
-    // assert!(active[..active.len() - 1]
-    //     .iter()
-    //     .zip(active[1..].iter())
-    //     .all(|(lower, higher)| lower.highest_timestamp == higher.lowest_timestamp - 1));
 
     Ok(subscription)
 }
